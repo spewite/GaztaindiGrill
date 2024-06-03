@@ -43,6 +43,8 @@ const char* programa = "{\"nombre\": \"Programa basico\",\"pasos\": [{\"tiempo\"
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
 
+long lastEncoderValue[2]     = {0, 0};
+int  lastTemperatureValue[2] = {0, 0};
 
 //////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////
@@ -81,21 +83,8 @@ void loop() {
 
   leer_reinicio();
   
-  printEncoder(0);
-
-  // static unsigned long lastEncoderReadTime = 0;
-  // unsigned long currentMillis = millis();
-
-  // if (currentMillis - lastEncoderReadTime >= 1000) {
-
-  //   //// ENCDOER ////
-  //   printEncoder(0);
-
-  //   //// TEMPERATURA ////
-  //   // printTemperature();
-
-  //   lastEncoderReadTime = currentMillis;
-  // }
+  print_encoder(0);
+  printTemperature(0);
 
 }
 
@@ -114,7 +103,6 @@ bool setupDevices() {
         imprimir("Error Begin Encoder " + String(i));
         // success = false;  // No retornar inmediatamente para permitir cualquier otra operación de limpieza o registro necesario.
     }
-    // encoder[i]->reset_counter(PULSES_ENCODER_GRILL);
     
     //////////// ACTUADORES LINEALES ////////////////
 
@@ -147,7 +135,12 @@ bool setupDevices() {
 void resetearSistema()
 {
   for (int i = 0; i < NUM_GRILLS; i++) 
-  {
+  {  
+    // // //////////// RESETEAR ENCODERS ////////////////
+    resetear_encoder(i);
+    print_encoder(i);
+
+
     // // //////////// RESETEAR ACTUADOR LINEAL ////////////////
     // subir(i);
     // imprimir("Subiendo la parrilla");
@@ -173,8 +166,6 @@ void resetearSistema()
     // imprimir("Dispositivos calibrados");
   }
 
-  //////////// RESETEAR ENCODERS LINEAL ////////////////
-  resetear_encoders();
 
 }
 
@@ -191,37 +182,23 @@ void resetearSistema()
 
 //////////// ENCODERS ////////////////
 long getEncoderValue(int i) {
+  long  encoderValue = encoder[i]->get_data(); // Leer el valor del encoder 
 
-  // digitalWrite(PIN_SPI_CS_GRILL_ENC[i], LOW); // Activar el chip select
-  long  encoderValue = encoder[i]->get_counter(); // Leer el valor del encoder 
-  // digitalWrite(PIN_SPI_CS_GRILL_ENC[i], HIGH); // Desactivar el chip select 
-     
+  // if (encoderValue > 100 || encoderValue <= 0) { 
+  //   return lastEncoderValue[i];
+  // }   
+
   return encoderValue;
-
-  // for (int attempts = 0; attempts < 3; attempts++) { // Intenta hasta 3 veces
-  //   digitalWrite(PIN_SPI_CS_GRILL_ENC[i], LOW); // Activar el chip select
-  //   encoderValue = encoder[i]->get_counter(false); // Leer el valor del encoder
-  //   digitalWrite(PIN_SPI_CS_GRILL_ENC[i], HIGH); // Desactivar el chip select
-
-  //   // Verifica si el valor del encoder es dentro de un rango esperado
-  //   // if (encoderValue >= 1 && encoderValue <= 101) {
-  //   if (encoderValue != 0) {
-  //     return encoderValue; // Retorna el valor si es válido
-  //   }
-  //   delay(10); // Pequeña pausa entre intentos
-  // }
-  
-  // Serial.println("Fallo al leer valor del encoder válido tras varios intentos.");
-  // return -20; // Devuelve un código de error o un valor específico si no se logra una lectura válida
 }
 
 
-void printEncoder(int i) {
+void print_encoder(int i) {
 
   long encoderValue = getEncoderValue(i);
 
-  if (encoderValue == 0) {return;}
-
+  if (encoderValue == 0 || encoderValue == lastEncoderValue[i]) {return;}  
+  lastEncoderValue[i] = encoderValue;
+  
   // Crear una cadena con el valor del encoder para publicar
   String encoderValueStr = String(encoderValue);
 
@@ -234,25 +211,34 @@ void printEncoder(int i) {
 
 //////////// PT100 ////////////////
 
-float getTemperature() {
+int getTemperature(int i = 0) {
     float temperature;
-    for (int attempts = 0; attempts < 3; attempts++) { // Intenta hasta 3 veces
-        digitalWrite(PIN_SPI_CS_GRILL_PT[0], LOW);
-        temperature = pt100.temperature(RNOMINAL, RREF);
-        digitalWrite(PIN_SPI_CS_GRILL_PT[0], HIGH);
 
-        if (temperature >= -100.0 && temperature <= 850.0) return temperature;
-        delay(10); // Pequeña pausa entre intentos
-    }
-    Serial.println("Fallo al leer temperatura válida tras varios intentos.");
-    return NAN; // Devuelve Not-A-Number si no se logra una lectura válida
+    digitalWrite(PIN_SPI_CS_GRILL_PT[i], LOW);
+    temperature = pt100.temperature(RNOMINAL, RREF);
+    digitalWrite(PIN_SPI_CS_GRILL_PT[i], HIGH);
+
+    return (int) temperature;
+
+    // for (int attempts = 0; attempts < 3; attempts++) { // Intenta hasta 3 veces
+    //     digitalWrite(PIN_SPI_CS_GRILL_PT[0], LOW);
+    //     temperature = pt100.temperature(RNOMINAL, RREF);
+    //     digitalWrite(PIN_SPI_CS_GRILL_PT[0], HIGH);
+
+    //     if (temperature >= -100.0 && temperature <= 850.0) return temperature;
+    //     delay(10); // Pequeña pausa entre intentos
+    // }
+    // Serial.println("Fallo al leer temperatura válida tras varios intentos.");
+    // return NAN; // Devuelve Not-A-Number si no se logra una lectura válida
 }
 
 
 
-void printTemperature() {
-  float temperature = getTemperature();
-  // Convertir la temperatura a una cadena para imprimir
+void printTemperature(int i) { 
+  int temperature = getTemperature(0);
+
+  if (temperature == lastTemperatureValue[i] || temperature < 0) {return;}  
+  lastTemperatureValue[i] = temperature;
 
   // Convertir la temperatura a String para publicar
   String temperatureStr = String(temperature);
@@ -278,19 +264,21 @@ void leer_reinicio()
     String input = Serial.readStringUntil('\n'); // Leer la línea completa
     // Comprobar si el comando es "reiniciar"
     if (input.equalsIgnoreCase("reiniciar")) {
-      Serial.println("Reiniciando ESP32...");
-      ESP.restart(); // Reinicia el ESP32
+      reiniciar();
     }
   }
+}    
+         
+
+void reiniciar()  
+{ 
+  imprimir("Reiniciando ESP32...");
+  ESP.restart(); // Reinicia el ESP32
 }
+           
 
-
-void resetear_encoders() {
-  for (int i = 0; i<NUM_GRILLS; i++)
-  {
-    encoder[i]->reset_counter(PULSES_ENCODER_GRILL);
-    printEncoder(i);  
-  }   
+void resetear_encoder(int i) {
+  encoder[i]->reset_counter(0); 
 }
 
 bool limitSwitchPulsado(int i)
@@ -388,8 +376,8 @@ void connectToWiFi() {
 
     // Incrementa el intervalo de intento de manera exponencial
     attemptInterval *= 2;  // Duplica el intervalo de tiempo para el próximo intento
-    if (attemptInterval > 16000) {  // Limita el intervalo máximo a 16 segundos
-      attemptInterval = 16000;
+    if (attemptInterval > 8000) {  // Limita el intervalo máximo a 8 segundos
+      attemptInterval = 8000;
     }
 
     if (millis() - startTime > maxTimeout) {
@@ -458,13 +446,15 @@ void handleMQTTMessage(char* topic, byte* payload, unsigned int length) {
   if (strcmp(topic, comandosParrilla0) == 0) {
     
     if (strcmp(mensaje, "subir") == 0) {
-        subir(0);
+      subir(0);
     } else if (strcmp(mensaje, "bajar") == 0) {
-        bajar(0);
-        imprimir("BAJAR");
-        delay(1000);
+      bajar(0);
+      imprimir("BAJAR");
+      delay(1000);
     } else if (strcmp(mensaje, "parar") == 0) {
-        parar(0);
+      parar(0);
+    } else if (strcmp(mensaje, "reiniciar") == 0) {  
+      reiniciar();
     }
 
   } 
