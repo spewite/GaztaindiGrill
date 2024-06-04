@@ -18,21 +18,22 @@ PubSubClient client(wifiClient);
 Grill* grills[NUM_GRILLS];
 
 void setup() {
-    Serial.begin(115200);
-    SPI.begin();
+  Serial.begin(115200);
+  SPI.begin();
 
-    connectToWiFi();
-    connectToMQTT();
+  connectToWiFi();
+  connectToMQTT();
 
-    for (int i = 0; i < NUM_GRILLS; ++i) {
-        grills[i] = new Grill(i);
-        if (grills[i]->setup_devices()) {
-            Serial.println("Los dispositivos de la parrilla " + String(i) + " se han configurado correctamente");
-            grills[i]->resetear_sistema();
-        } else {
-            Serial.println("Ha habido un error al configurar los dispositivos de la parrilla " + String(i));
-        }
-    }
+  for (int i = 0; i < NUM_GRILLS; ++i) {
+      grills[i] = new Grill(i);
+      if (grills[i]->setup_devices()) {
+          Serial.println("Los dispositivos de la parrilla " + String(i) + " se han configurado correctamente");
+          grills[i]->resetear_sistema();
+      } else {
+          Serial.println("Ha habido un error al configurar los dispositivos de la parrilla " + String(i));
+      }
+  }
+  client.setCallback(handleMQTTCallback);
 }
 
 void loop() {
@@ -66,5 +67,21 @@ void connectToMQTT() {
             Serial.println(" try again in 5 seconds");
             delay(5000);
         }
+    }
+}
+
+void handleMQTTCallback(char* topic, byte* payload, unsigned int length) {
+    char mensaje[length + 1];
+    memcpy(mensaje, payload, length);
+    mensaje[length] = '\0';
+
+    // Extraer id y accion del topic asumiendo el formato "grill/{id}/{accion}"
+    int id;
+    char accion[20]; // Asumiendo que el tamaño de 'accion' no superará los 20 caracteres
+    sscanf(topic, "grill/%d/%s", &id, accion);
+
+    // Verificar que el id es válido antes de usarlo
+    if (id >= 0 && id < NUM_GRILLS) {
+        grills[id]->handleMQTTMessage(accion, mensaje);
     }
 }
