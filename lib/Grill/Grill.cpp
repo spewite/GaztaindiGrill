@@ -165,9 +165,19 @@ String Grill::parse_topic(String accion) {
     return "grill/" + String(index) + "/" + accion;
 }
 
-void Grill::handleMQTTMessage(const char* topic, const char* payload) {
+// String Grill::decode_topic(String topic) {
+//     int lastSlashIndex = topic.lastIndexOf('/');
+//     if (lastSlashIndex == -1) {
+//         return topic; // Devuelve una cadena vacía si no se encuentra '/'
+//     }
+//     return topic.substring(lastSlashIndex + 1);
+// }
+
+void Grill::handleMQTTMessage(const char* pAccion, const char* payload) {
     // Assuming the payload contains a float value
-    String accion(topic);
+    String accion(pAccion);
+
+    publicarMQTT(parse_topic("log"), "Ha llegado una accion a la parrila + " + String(index) + ": " + accion);
 
     if (accion == "subir") {
         subir();

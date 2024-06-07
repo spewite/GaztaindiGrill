@@ -25,6 +25,7 @@ Grill* grills[NUM_GRILLS];
 void connectToWiFi();
 void connectToMQTT();
 void handleMQTTCallback(char* topic, byte* payload, unsigned int length);
+bool publicarMQTT(const String& topic, const String& payload);
 
 void setup() {
   Serial.begin(115200);
@@ -79,6 +80,14 @@ void connectToMQTT() {
     }
 }
 
+bool publicarMQTT(const String& topic, const String& payload) {
+    if (!client.connected()) {
+        extern void connectToMQTT();
+        connectToMQTT();
+    }
+    return client.publish(topic.c_str(), payload.c_str());
+}
+
 void handleMQTTCallback(char* topic, byte* payload, unsigned int length) {
     char mensaje[length + 1];
     memcpy(mensaje, payload, length);
@@ -88,6 +97,8 @@ void handleMQTTCallback(char* topic, byte* payload, unsigned int length) {
     int id;
     char accion[20]; // Asumiendo que el tamaño de 'accion' no superará los 20 caracteres
     sscanf(topic, "grill/%d/%s", &id, accion);
+
+    publicarMQTT("grill/0", "Nuevo topic: " + String(topic));
 
     // Verificar que el id es válido antes de usarlo
     if (id >= 0 && id < NUM_GRILLS) {

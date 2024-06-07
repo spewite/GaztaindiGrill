@@ -50,7 +50,7 @@ private:
     void imprimir(String msg);
     bool publicarMQTT(const String& topic, const String& payload);
     String parse_topic(String accion);
-    String decode_topic(String accion);
+    // String decode_topic(String accion);
 };
 
 #endif
