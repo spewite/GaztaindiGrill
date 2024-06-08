@@ -33,9 +33,11 @@ public:
     void bajar();
     void parar();
     void voltear();   
+    void go_to(int posicion);
     void handleMQTTMessage(const char* topic, const char* payload);
     void executeProgram(const char* program);
     void subscribe_topics();
+    void manejarMovimiento();
 
 private:
     int index;
@@ -52,6 +54,19 @@ private:
     bool publicarMQTT(const String& topic, const String& payload);
     String parse_topic(String accion);
     // String decode_topic(String accion);
+
+    // GO_TO FUNTZIYUAN HILUA EZ BLOKEATZEKO
+    enum EstadoMovimiento {
+        MOVIMIENTO_IDLE,       // Estado de espera, sin movimiento
+        MOVIMIENTO_SUBIENDO,   // Estado de movimiento subiendo
+        MOVIMIENTO_BAJANDO,    // Estado de movimiento bajando
+        MOVIMIENTO_COMPLETADO  // Estado cuando se alcanza la posición deseada
+    };
+
+    EstadoMovimiento estadoMovimiento;  // Añadido para rastrear el estado del movimiento
+    int posicionObjetivo;  // Añadido para rastrear la posición objetivo
+
+    const char* estadoMovimientoToString(EstadoMovimiento estado);  // Declaración de la función de conversión
 };
 
 #endif

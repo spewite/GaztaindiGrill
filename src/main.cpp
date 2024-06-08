@@ -41,6 +41,7 @@ void setup() {
             Serial.println("Los dispositivos de la parrilla " + String(i) + " se han configurado correctamente");
             grills[i]->resetear_sistema();
             grills[i]->subscribe_topics();
+
         } else {
             Serial.println("Ha habido un error al configurar los dispositivos de la parrilla " + String(i));
         }
@@ -48,13 +49,14 @@ void setup() {
 }
 
 void loop() {
-  if (!client.connected()) {
-      connectToMQTT();
-  }
-  client.loop(); 
-    
-  grills[0]->print_encoder();
-  grills[0]->print_temperature();
+    if (!client.connected()) {
+        connectToMQTT();
+    }
+    client.loop(); 
+
+    grills[0]->print_encoder();
+    grills[0]->print_temperature();
+    grills[0]->manejarMovimiento();  // Llama a manejarMovimiento para cada parrilla
 }
 
 void connectToWiFi() {
