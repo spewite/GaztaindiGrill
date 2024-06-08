@@ -19,7 +19,7 @@ typedef bool (*MQTTPublishFunction)(const String&, const String&);
 
 
 Grill::Grill(int index) 
-    : index(index), encoder(nullptr), drive(nullptr), rotor(nullptr), pt100(PIN_SPI_CS_GRILL_PT[0]), lastEncoderValue(0), lastTemperatureValue(0), estadoMovimiento(MOVIMIENTO_IDLE), posicionObjetivo(-1) {}
+    : index(index), encoder(nullptr), drive(nullptr), rotor(nullptr), pt100(PIN_SPI_CS_GRILL_PT[0]), lastEncoderValue(0), lastTemperatureValue(0), posicionObjetivo(-1) {}
 
 bool Grill::setup_devices() {
     // ENCODER
@@ -50,9 +50,7 @@ bool Grill::setup_devices() {
 }
 
 void Grill::resetear_sistema() {
-    resetear_encoder();
-    print_encoder();
-
+    
     // //////////// RESETEAR ROTOR ////////////////
 
     // imprimir("Reseteando el rotor");
@@ -63,13 +61,19 @@ void Grill::resetear_sistema() {
     // rotor->stop();
 
     // //////////// RESETEAR ACTUADOR LINEAL ////////////////
-    // subir(); 
-    // imprimir("Subiendo la parrilla");
-    // while (!esta_arriba()) {
-    //   imprimir("no esta arriba");
-    // } 
-    // imprimir("esta arriba");
-    // parar();
+    subir(); 
+    imprimir("Subiendo la parrilla");
+
+    while (!limit_switch_pulsado()) { // Oain rotorran berdiña, beste switch bat jarri
+        // imprimir("No esta arriba");
+    }
+
+    imprimir("esta arriba");
+    parar();
+
+    // //////////// RESETEAR ENCODER ////////////////
+    resetear_encoder();
+    print_encoder();
 
     imprimir("Dispositivos calibrados");  
 }
@@ -80,8 +84,7 @@ void Grill::resetear_sistema() {
 /// -------------------------- ///
 
 long Grill::get_encoder_value() {
-    long encoderValue = encoder->get_data();
-    return encoderValue;
+    return 100 - encoder->get_data();
 }
 
 void Grill::print_encoder() {
@@ -135,9 +138,6 @@ void Grill::voltear() {
     delay(1000);
 }
 
-bool Grill::esta_arriba() {
-}
-
 // bool Grill::esta_arriba() {
 //     float old_pos;
 
@@ -170,8 +170,7 @@ void Grill::manejarMovimiento() {
     int currentPercentage = get_encoder_value();
     int margen = 2;
 
-    publicarMQTT("MANEJAR MOVIMIENTO", String(abs(posicionObjetivo)));
-    // publicarMQTT("MANEJAR MOVIMIENTO", String(abs(currentPercentage - posicionObjetivo)));
+    // publicarMQTT("MANEJAR MOVIMIENTO", String(abs(posicionObjetivo)));
 
     if (abs(currentPercentage - posicionObjetivo) <= margen && posicionObjetivo>0) {
         parar();
