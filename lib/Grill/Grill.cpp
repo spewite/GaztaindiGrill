@@ -14,6 +14,8 @@ extern const char* mqttPassword;
 
 extern PubSubClient client;
 
+#define ENCODER_ERROR -9999.0 // Definir un valor especial que represente cuando el encoder lee mal un valor.
+
 // Definir un tipo de función para la publicación MQTT
 typedef bool (*MQTTPublishFunction)(const String&, const String&);
 
@@ -51,7 +53,7 @@ bool Grill::setup_devices() {
 
 void Grill::resetear_sistema() {
     
-    // //////////// RESETEAR ROTOR ////////////////
+    // ------------- RESETEAR ROTOR ------------- //
 
     // imprimir("Reseteando el rotor");
     // rotor->go(ROTOR_ON);
@@ -60,20 +62,35 @@ void Grill::resetear_sistema() {
 
     // rotor->stop();
 
-    // //////////// RESETEAR ACTUADOR LINEAL ////////////////
+    // ------------- RESETEAR ACTUADOR LINEAL ------------- //
     subir(); 
     imprimir("Subiendo la parrilla");
 
+    // Variables para controlar el tiempo no bloqueante
+    unsigned long previousMessageMillis = 0;
+    const long messageInterval = 1000; // Intervalo de 1 segundo
+
     while (!limit_switch_pulsado()) { // Oain rotorran berdiña, beste switch bat jarri
-        // imprimir("No esta arriba");
+
+        unsigned long currentMillis = millis();
+
+        // Comprobar si ha pasado 1 segundo desde el último mensaje
+        if (currentMillis - previousMessageMillis >= messageInterval) {
+            previousMessageMillis = currentMillis;
+            // Imprimir el mensaje
+            imprimir("Reseteando actuador lineal...");
+        }
+
+        // Asegurarse de que el cliente MQTT sigue funcionando
+        client.loop();
     }
 
     imprimir("esta arriba");
     parar();
 
-    // //////////// RESETEAR ENCODER ////////////////
+    // ------------- RESETEAR ENCODER ------------- //
     resetear_encoder();
-    print_encoder();
+    update_encoder();
 
     imprimir("Dispositivos calibrados");  
 }
@@ -84,13 +101,20 @@ void Grill::resetear_sistema() {
 /// -------------------------- ///
 
 long Grill::get_encoder_value() {
-    return 100 - encoder->get_data();
+    long encoderValue = encoder->get_data();
+
+    if (encoderValue < 0) encoderValue = 1;
+    if (encoderValue > 100) encoderValue = 100;
+    if (encoderValue == 0) encoderValue = ENCODER_ERROR;
+
+    return encoderValue;
 }
 
-void Grill::print_encoder() {
+void Grill::update_encoder() {
     long encoderValue = get_encoder_value();
-    if (encoderValue == 0 || encoderValue == lastEncoderValue) { return; }
+    if (encoderValue == ENCODER_ERROR || encoderValue == lastEncoderValue) { return; }
     lastEncoderValue = encoderValue;
+    encoderValue = 100 - encoderValue;
 
     String encoderValueStr = String(encoderValue);
     String stringTopicEncoder = parse_topic("posicion");
@@ -106,7 +130,7 @@ int Grill::get_temperature() {
     return (int) temperature;
 }
 
-void Grill::print_temperature() {
+void Grill::update_temperature() {
     int temperature = get_temperature();
     if (temperature == lastTemperatureValue || temperature < 0) { return; }
     lastTemperatureValue = temperature;
@@ -138,19 +162,8 @@ void Grill::voltear() {
     delay(1000);
 }
 
-// bool Grill::esta_arriba() {
-//     float old_pos;
-
-//     old_pos = encoder->get_data();
-//     delay(1000);
-
-//     return (encoder->get_data() == old_pos);
-// }
-  
-
 void Grill::go_to(int posicion) {
 
-    // En la funcion manejarMovimiento(), que se llamada en loop, manejamos cuando tenemos que parar.
     if (posicion < 0 || posicion > 100) {
         imprimir("Posición fuera de rango");
         return;
@@ -158,6 +171,7 @@ void Grill::go_to(int posicion) {
     posicionObjetivo = posicion;
     int currentPercentage = get_encoder_value();
 
+    // En la funcion manejarMovimiento(), que se llamada en loop, manejamos cuando tenemos que parar.
     if (currentPercentage < posicion) {
         subir();
     } else if (currentPercentage > posicion) {
@@ -169,8 +183,6 @@ void Grill::manejarMovimiento() {
 
     int currentPercentage = get_encoder_value();
     int margen = 2;
-
-    // publicarMQTT("MANEJAR MOVIMIENTO", String(abs(posicionObjetivo)));
 
     if (abs(currentPercentage - posicionObjetivo) <= margen && posicionObjetivo>0) {
         parar();
@@ -242,14 +254,10 @@ void Grill::handleMQTTMessage(const char* pAccion, const char* pPayload) {
    if (accion == "dirigir") {
         if (payload == "subir") {
             subir();
-            // go_to(100);  // Ejemplo: subir hasta el 100%
         } else if (payload == "bajar") {
             bajar();
-            // go_to(0);  // Ejemplo: bajar hasta el 0%
         } else if (payload == "parar") {
             parar();
-            // estadoMovimiento = MOVIMIENTO_IDLE;
-            // imprimir("Movimiento detenido por comando MQTT");
         }
     } else if (accion == "establecer_posicion") {
         int posicion = payload.toInt();

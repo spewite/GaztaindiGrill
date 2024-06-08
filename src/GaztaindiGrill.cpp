@@ -21,6 +21,9 @@ PubSubClient client(wifiClient);
 
 Grill* grills[NUM_GRILLS];
 
+unsigned long previousMillis = 0; 
+const long interval = 3000; // Intervalo de 5 segundos
+
 // Declaración de funciones
 void connectToWiFi();
 void connectToMQTT();
@@ -54,9 +57,19 @@ void loop() {
     }
     client.loop(); 
 
-    grills[0]->print_encoder();
-    grills[0]->print_temperature();
-    grills[0]->manejarMovimiento();  // Llama a manejarMovimiento para cada parrilla
+    unsigned long currentMillis = millis();
+
+    grills[0]->update_encoder();
+    grills[0]->manejarMovimiento();
+
+    // Leer la tempeartura cada 3 para evitar la sobrecarga
+    if (currentMillis - previousMillis >= interval) {
+        // Guardar el tiempo actual
+        previousMillis = currentMillis;
+
+        // Ejecutar las funciones cada 5 segundos
+        grills[0]->update_temperature();
+    }
 }
 
 void connectToWiFi() {

@@ -26,8 +26,8 @@ public:
     void resetear_sistema();
     long get_encoder_value();
     int  get_temperature();
-    void print_encoder();
-    void print_temperature();
+    void update_encoder();
+    void update_temperature();
     // bool esta_arriba();
     void subir();
     void bajar();
