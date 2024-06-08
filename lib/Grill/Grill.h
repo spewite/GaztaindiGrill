@@ -35,6 +35,7 @@ public:
     void voltear();   
     void handleMQTTMessage(const char* topic, const char* payload);
     void executeProgram(const char* program);
+    void subscribe_topics();
 
 private:
     int index;

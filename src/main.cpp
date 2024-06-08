@@ -28,22 +28,23 @@ void handleMQTTCallback(char* topic, byte* payload, unsigned int length);
 bool publicarMQTT(const String& topic, const String& payload);
 
 void setup() {
-  Serial.begin(115200);
-  SPI.begin();
+    Serial.begin(115200);
+    SPI.begin();
 
-  connectToWiFi();
-  connectToMQTT();
+    connectToWiFi();
+    client.setCallback(handleMQTTCallback); // Mover esta línea antes de connectToMQTT
+    connectToMQTT();
 
-  for (int i = 0; i < NUM_GRILLS; ++i) {
-      grills[i] = new Grill(i);
-      if (grills[i]->setup_devices()) {
-          Serial.println("Los dispositivos de la parrilla " + String(i) + " se han configurado correctamente");
-          grills[i]->resetear_sistema();
-      } else {
-          Serial.println("Ha habido un error al configurar los dispositivos de la parrilla " + String(i));
-      }
-  }
-  client.setCallback(handleMQTTCallback);
+    for (int i = 0; i < NUM_GRILLS; ++i) {
+        grills[i] = new Grill(i);
+        if (grills[i]->setup_devices()) {
+            Serial.println("Los dispositivos de la parrilla " + String(i) + " se han configurado correctamente");
+            grills[i]->resetear_sistema();
+            grills[i]->subscribe_topics();
+        } else {
+            Serial.println("Ha habido un error al configurar los dispositivos de la parrilla " + String(i));
+        }
+    }
 }
 
 void loop() {
@@ -82,7 +83,6 @@ void connectToMQTT() {
 
 bool publicarMQTT(const String& topic, const String& payload) {
     if (!client.connected()) {
-        extern void connectToMQTT();
         connectToMQTT();
     }
     return client.publish(topic.c_str(), payload.c_str());
@@ -95,10 +95,8 @@ void handleMQTTCallback(char* topic, byte* payload, unsigned int length) {
 
     // Extraer id y accion del topic asumiendo el formato "grill/{id}/{accion}"
     int id;
-    char accion[20]; // Asumiendo que el tamaño de 'accion' no superará los 20 caracteres
+    char accion[120]; // Asumiendo que el tamaño de 'accion' no superará los 20 caracteres
     sscanf(topic, "grill/%d/%s", &id, accion);
-
-    publicarMQTT("grill/0", "Nuevo topic: " + String(topic));
 
     // Verificar que el id es válido antes de usarlo
     if (id >= 0 && id < NUM_GRILLS) {

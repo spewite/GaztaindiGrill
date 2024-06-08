@@ -51,27 +51,29 @@ void Grill::resetear_sistema() {
     resetear_encoder();
     print_encoder();
 
-    // RESETEAR ROTOR
-    imprimir("Reseteando el  rotor");
-    rotor->go(ROTOR_ON);
-    while (!limit_switch_pulsado()) {}
-    rotor->stop();
+    // //////////// RESETEAR ROTOR ////////////////
+
+    // imprimir("Reseteando el rotor");
+    // rotor->go(ROTOR_ON);
+
+    // while (!limit_switch_pulsado()) {}
+
+    // rotor->stop();
+
+    // //////////// RESETEAR ACTUADOR LINEAL ////////////////
+    // subir();
+    // imprimir("Subiendo la parrilla");
+    // while (!esta_arriba()) {
+    //   imprimir("no esta arriba");
+    // } 
+    // imprimir("esta arriba");
+    // parar();
+
     imprimir("Dispositivos calibrados");  
-
-    // // //////////// RESETEAR ACTUADOR LINEAL ////////////////
-    subir();
-    imprimir("Subiendo la parrilla");
-
-    while (!esta_arriba()) {
-      imprimir("no esta arriba");
-    } 
-
-    imprimir("esta arriba");
-    parar();
 }
 
 long Grill::get_encoder_value() {
-    long encoderValue = encoder->get_data();
+    long encoderValue = encoder->get_counter();
     return encoderValue;
 }
 
@@ -82,7 +84,7 @@ void Grill::print_encoder() {
 
     String encoderValueStr = String(encoderValue);
     String stringTopicEncoder = parse_topic("posicion");
-    Serial.println(encoderValue);
+    Serial.println("Encoder " + String(index) + " = " + encoderValue);
     publicarMQTT(stringTopicEncoder, encoderValueStr);
 }
 
@@ -165,31 +167,44 @@ String Grill::parse_topic(String accion) {
     return "grill/" + String(index) + "/" + accion;
 }
 
-// String Grill::decode_topic(String topic) {
-//     int lastSlashIndex = topic.lastIndexOf('/');
-//     if (lastSlashIndex == -1) {
-//         return topic; // Devuelve una cadena vacía si no se encuentra '/'
-//     }
-//     return topic.substring(lastSlashIndex + 1);
-// }
+void Grill::subscribe_topics() {
+    if (!client.connected()) {
+        Serial.println("Cliente MQTT no está conectado. No se pueden suscribir los tópicos.");
+        return;
+    }
+
+    const char* topics[] = {"log", "subir", "bajar", "parar", "reiniciar"};
+    const int numTopics = sizeof(topics) / sizeof(topics[0]);
+
+    for (int i = 0; i < numTopics; ++i) {
+        String topic = parse_topic(topics[i]);
+        if (client.subscribe(topic.c_str())) {
+            Serial.println("Subscribed to: " + topic);
+        } else {
+            Serial.println("Failed to subscribe to: " + topic);
+        }
+    }
+}
 
 void Grill::handleMQTTMessage(const char* pAccion, const char* payload) {
     // Assuming the payload contains a float value
     String accion(pAccion);
 
-    publicarMQTT(parse_topic("log"), "Ha llegado una accion a la parrila + " + String(index) + ": " + accion);
+    publicarMQTT(parse_topic("mqtt_topic_listener"), "Ha llegado una accion a la parrila " + String(index) + ": " + accion);
 
     if (accion == "subir") {
         subir();
-        imprimir("SUBIENDOO");
+        imprimir("Subiendo");
     } else if (accion == "bajar") {
         bajar();
-        imprimir("BAJAR");
+        Serial.println("BAJANDO");
+        imprimir("Bajando");
     } else if (accion == "parar") {
         parar();
+        imprimir("Parando");
     } else if (accion == "reiniciar") {
-        resetear_sistema();
-    }
+        imprimir("Reiniciando sistema");
+    } 
 }
 
 void Grill::executeProgram(const char* program) {
@@ -227,3 +242,11 @@ void Grill::executeProgram(const char* program) {
         }
     }
 }
+
+// String Grill::decode_topic(String topic) {
+//     int lastSlashIndex = topic.lastIndexOf('/');
+//     if (lastSlashIndex == -1) {
+//         return topic; // Devuelve una cadena vacía si no se encuentra '/'
+//     }
+//     return topic.substring(lastSlashIndex + 1);
+// }
