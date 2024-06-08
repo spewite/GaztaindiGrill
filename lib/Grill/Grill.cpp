@@ -17,7 +17,6 @@ extern PubSubClient client;
 // Definir un tipo de función para la publicación MQTT
 typedef bool (*MQTTPublishFunction)(const String&, const String&);
 
-float test[] = {0, 100};
 
 Grill::Grill(int index) 
     : index(index), encoder(nullptr), drive(nullptr), rotor(nullptr), pt100(PIN_SPI_CS_GRILL_PT[0]), lastEncoderValue(0), lastTemperatureValue(0), estadoMovimiento(MOVIMIENTO_IDLE), posicionObjetivo(-1) {}
@@ -25,7 +24,7 @@ Grill::Grill(int index)
 bool Grill::setup_devices() {
     // ENCODER
     encoder = new DeviceEncoder(PIN_SPI_CS_GRILL_ENC[index]);
-    if (!encoder->begin(PULSES_ENCODER_GRILL, test, false)) {
+    if (!encoder->begin(PULSES_ENCODER_GRILL, DATA_INTERVAL_GRILL, false)) {
         imprimir("Error Begin Encoder " + String(index));
         return false;
     }
@@ -64,7 +63,7 @@ void Grill::resetear_sistema() {
     // rotor->stop();
 
     // //////////// RESETEAR ACTUADOR LINEAL ////////////////
-    // subir();
+    // subir(); 
     // imprimir("Subiendo la parrilla");
     // while (!esta_arriba()) {
     //   imprimir("no esta arriba");
@@ -74,6 +73,11 @@ void Grill::resetear_sistema() {
 
     imprimir("Dispositivos calibrados");  
 }
+
+/// -------------------------- ///
+///          GET/PRINT         /// 
+///         PERIFERICOS        /// 
+/// -------------------------- ///
 
 long Grill::get_encoder_value() {
     long encoderValue = encoder->get_data();
@@ -109,24 +113,10 @@ void Grill::print_temperature() {
     publicarMQTT(parse_topic("temperatura"), temperatureStr);
 }
  
-
-bool Grill::esta_arriba() {
-  float old_pos;
-
-  // do // Asegurarse que la lectura del encoder es correcto.
-  // {
-    old_pos = encoder->get_data();
-    imprimir(String(old_pos));
-  // } while (old_pos == 0);
-
-  
-  delay(1000);
-
-  imprimir(String(old_pos));
-  
-  return (encoder->get_data() == old_pos);
-}
-  
+/// -------------------------///
+///          ACTUADOR        /// 
+///           LINEAL         /// 
+/// -------------------------///
 
 void Grill::subir() {
     drive->setSpeed(-255);
@@ -145,85 +135,67 @@ void Grill::voltear() {
     delay(1000);
 }
 
+bool Grill::esta_arriba() {
+}
+
+// bool Grill::esta_arriba() {
+//     float old_pos;
+
+//     old_pos = encoder->get_data();
+//     delay(1000);
+
+//     return (encoder->get_data() == old_pos);
+// }
+  
+
 void Grill::go_to(int posicion) {
 
+    // En la funcion manejarMovimiento(), que se llamada en loop, manejamos cuando tenemos que parar.
     if (posicion < 0 || posicion > 100) {
         imprimir("Posición fuera de rango");
         return;
     }
-
     posicionObjetivo = posicion;
     int currentPercentage = get_encoder_value();
 
     if (currentPercentage < posicion) {
-        estadoMovimiento = MOVIMIENTO_SUBIENDO;
+        subir();
     } else if (currentPercentage > posicion) {
-        estadoMovimiento = MOVIMIENTO_BAJANDO;
-    } else {
-        estadoMovimiento = MOVIMIENTO_COMPLETADO;
-        imprimir("Posición alcanzada: " + String(posicion));
+        bajar();
     }
-
-    imprimir("Termina GO_TO en estado: " +  String(estadoMovimientoToString(estadoMovimiento)));
 }
-
 
 void Grill::manejarMovimiento() {
-    
+
     int currentPercentage = get_encoder_value();
+    int margen = 2;
 
-    publicarMQTT(parse_topic("ESTADO_MOVIEMIETN1: "), "ESTADO Go_TO: " + String(estadoMovimientoToString(estadoMovimiento)));
+    publicarMQTT("MANEJAR MOVIMIENTO", String(abs(posicionObjetivo)));
+    // publicarMQTT("MANEJAR MOVIMIENTO", String(abs(currentPercentage - posicionObjetivo)));
 
-
-    switch (estadoMovimiento) {
-        case MOVIMIENTO_SUBIENDO:
-            if (currentPercentage < posicionObjetivo) {
-                subir();
-            } else {
-                parar();
-                estadoMovimiento = MOVIMIENTO_COMPLETADO;
-                imprimir("Posición alcanzada: " + String(posicionObjetivo));
-            }
-            break;
-
-        case MOVIMIENTO_BAJANDO:
-            if (currentPercentage > posicionObjetivo) {
-                bajar();
-            } else {
-                parar();
-                estadoMovimiento = MOVIMIENTO_COMPLETADO;
-                imprimir("Posición alcanzada: " + String(posicionObjetivo));
-            }
-            break;
-
-        case MOVIMIENTO_COMPLETADO:
-            // No hacer nada
-            break;
-
-        case MOVIMIENTO_IDLE:
-        default:
-            // No hacer nada
-            break;
-    }
+    if (abs(currentPercentage - posicionObjetivo) <= margen && posicionObjetivo>0) {
+        parar();
+        posicionObjetivo = -1;
+    } 
 }
 
-const char* Grill::estadoMovimientoToString(Grill::EstadoMovimiento estado) {
-    switch (estado) {
-        case Grill::MOVIMIENTO_IDLE:       return "MOVIMIENTO_IDLE";
-        case Grill::MOVIMIENTO_SUBIENDO:   return "MOVIMIENTO_SUBIENDO";
-        case Grill::MOVIMIENTO_BAJANDO:    return "MOVIMIENTO_BAJANDO";
-        case Grill::MOVIMIENTO_COMPLETADO: return "MOVIMIENTO_COMPLETADO";
-        default:                           return "UNKNOWN";
-    }
-}
+/// -------------------------- ///
+///         PERIFERICOS        /// 
+/// -------------------------- ///
 
 void Grill::resetear_encoder() {
     encoder->reset_counter(0);
 }
 
+
 bool Grill::limit_switch_pulsado() {
     return digitalRead(PIN_CS_LIMIT_SWITCH[index]) == LOW;
 }
+
+
+/// ----------------------///
+///          MQTT         /// 
+/// ----------------------///
 
 void Grill::imprimir(String msg) {
     Serial.println(msg);
@@ -266,7 +238,7 @@ void Grill::handleMQTTMessage(const char* pAccion, const char* pPayload) {
     String accion(pAccion);
     String payload(pPayload);
 
-    publicarMQTT(parse_topic("mqtt_topic_listener"), "Ha llegado una accion a la parrila " + String(index) + ": " + accion);
+    publicarMQTT(parse_topic("mqtt_topic_listener"), "Ha llegado una accion a la parrila " + String(index) + ". " + accion) + ": " + payload + ")";
 
    if (accion == "dirigir") {
         if (payload == "subir") {
