@@ -57,18 +57,22 @@ void loop() {
     }
     client.loop(); 
 
-    unsigned long currentMillis = millis();
-
+    grills[0]->update_rotor_encoder();
     grills[0]->update_encoder();
-    grills[0]->manejarMovimiento();
+
+    grills[0]->manejar_parada_rotor(); // Parar si ha llegado al objetivo en go_to_rotor
+    grills[0]->manejar_parada_encoder(); // Parar si ha llegado al objetivo en go_to_
+    grills[0]->manejar_parada_temperatura(); // Parar si ha llegado al objetivo en go_to_temp
+    grills[0]->update_programa(); // Ejecutar los pasos de los programas
+
+    unsigned long currentMillis = millis();
 
     // Leer la tempeartura cada 3 para evitar la sobrecarga
     if (currentMillis - previousMillis >= interval) {
         // Guardar el tiempo actual
         previousMillis = currentMillis;
 
-        // Ejecutar las funciones cada 5 segundos
-        grills[0]->update_temperature();
+        grills[0]->update_temperature(); // Kontuan euki ezkerreko parrillak bakarrik eukikoula pt100
     }
 }
 

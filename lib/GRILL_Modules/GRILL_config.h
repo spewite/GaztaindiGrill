@@ -20,15 +20,15 @@ const int PIN_SPI_MOSI       = 23;
 const int PIN_SPI_SCK        = 18;
 
 // SPI SELEC Pt100 MAX31865
-const int PIN_SPI_CS_GRILL_PT[]  = {13, 22};
+const int PIN_SPI_CS_GRILL_PT    = 13;
 // SPI SELEC Encoders
-const int PIN_SPI_CS_GRILL_ENC[] = {2, 4, 16}; // Default: 2, 12, 13
+const int PIN_SPI_CS_GRILL_ENC[] = {2, 4}; // Default: 2, 12, 13
 const int PIN_SPI_CS_ROTOR_ENC   = 15;  
 // Grill Linear Motor drive
 const int PIN_GRILL_PWM[]        = {33, 25}; //  {25, 32}
-const int PIN_GRILL_DIR[]        = {26, 32}; //  {26, 33}
+const int PIN_GRILL_DIR[]        = {35, 32}; //  {26, 33}
  
-const int PIN_CS_ROTOR[]         = {14, 12};
+const int PIN_CS_ROTOR           = 14;
 const int PIN_CS_LIMIT_SWITCH[]  = {27, 0};
 // const int PIN_CUALQUIERCOSA      = 00;
 
