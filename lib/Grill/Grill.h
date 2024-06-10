@@ -51,7 +51,8 @@ public:
     void subscribe_topics();
 
     void manejar_parada_rotor();
-    void manejar_movimiento();
+    void manejar_parada_encoder();
+    void manejar_parada_temperatura();
     void update_programa();
 
 private:
@@ -88,7 +89,7 @@ private:
     int numPasos;
     int currentStep;
     bool stepInProgress;
-    unsigned long startTime;
+    unsigned long tiempoInicioPaso;
     bool cancelarPrograma; // Bandera para cancelar el programa
 };
 

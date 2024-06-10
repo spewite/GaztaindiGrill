@@ -22,7 +22,7 @@ typedef bool (*MQTTPublishFunction)(const String&, const String&);
 
 
 Grill::Grill(int index) 
-    : index(index), encoder(nullptr), rotorEncoder(nullptr), drive(nullptr), rotor(nullptr), pt100(PIN_SPI_CS_GRILL_PT), lastEncoderValue(0), lastRotorEncoderValue(0), lastTemperatureValue(0), rotorVueltas(0), posicionObjetivo(SIN_OBJETIVO), gradosObjetivo(SIN_OBJETIVO), temperaturaObjetivo(SIN_OBJETIVO), numPasos(0), currentStep(0), stepInProgress(false), startTime(0), cancelarPrograma(false) {}
+    : index(index), encoder(nullptr), rotorEncoder(nullptr), drive(nullptr), rotor(nullptr), pt100(PIN_SPI_CS_GRILL_PT), lastEncoderValue(0), lastRotorEncoderValue(0), lastTemperatureValue(0), rotorVueltas(0), posicionObjetivo(SIN_OBJETIVO), gradosObjetivo(SIN_OBJETIVO), temperaturaObjetivo(SIN_OBJETIVO), numPasos(0), currentStep(0), stepInProgress(false), tiempoInicioPaso(0), cancelarPrograma(false) {}
 
 bool Grill::setup_devices() {
 
@@ -287,15 +287,17 @@ void Grill::go_to(int posicion) {
 }
 
 void Grill::manejar_parada_encoder() {
-
     int currentPercentage = get_encoder_value();
     int margen = 2;
 
     if (abs(currentPercentage - posicionObjetivo) <= margen && posicionObjetivo != SIN_OBJETIVO ) {
         parar();
         posicionObjetivo = SIN_OBJETIVO;
+        stepInProgress = true; // Marca que el paso está en progreso después de alcanzar la posición
+        tiempoInicioPaso = millis(); // Comienza a contar el tiempo ahora
     } 
 }
+
 
 // ------------- PT100 ------------- //
 
@@ -313,13 +315,14 @@ void Grill::go_to_temp(int temperatura) {
 }
 
 void Grill::manejar_parada_temperatura() {
-
     int currentTemperature = get_temperature();
-    int margen = 20;
+    int margen = 2; // Ajusta el margen según sea necesario
 
     if (abs(currentTemperature - temperaturaObjetivo) <= margen && temperaturaObjetivo != SIN_OBJETIVO ) {
         parar();
         temperaturaObjetivo = SIN_OBJETIVO;
+        stepInProgress = true; // Marca que el paso está en progreso después de alcanzar la temperatura
+        tiempoInicioPaso = millis(); // Comienza a contar el tiempo ahora
     } 
 }
 
@@ -445,14 +448,13 @@ void Grill::executeProgram(const char* program) {
     // Inicializar variables de estado
     currentStep = 0;
     stepInProgress = false;
-    startTime = millis();
+    tiempoInicioPaso = millis();
     cancelarPrograma = false; // Reiniciar la bandera de cancelación al iniciar un nuevo programa
 }
 
 
 
 void Grill::update_programa() {
-
     if (cancelarPrograma) {
         parar();
         return; // Salir si el programa ha sido cancelado
@@ -462,9 +464,9 @@ void Grill::update_programa() {
         return; // No hay más pasos que ejecutar
     }
 
-    if (!stepInProgress) {
-        Paso& paso = pasos[currentStep];
+    Paso& paso = pasos[currentStep];
 
+    if (!stepInProgress) {
         if (paso.accion) {
             Serial.print("Executing step - Accion: ");
             Serial.println(paso.accion);
@@ -477,16 +479,15 @@ void Grill::update_programa() {
         } else {
             if (paso.temperatura != -1) {
                 go_to_temp(paso.temperatura);
+                return; // Salir de la función para esperar a que se alcance la temperatura
             } else if (paso.posicion != -1) {
                 go_to(paso.posicion);
+                return; // Salir de la función para esperar a que se alcance la posición
             }
-
-            startTime = millis();
-            stepInProgress = true;
         }
     } else {
-        unsigned long elapsedTime = millis() - startTime;
-        int tiempo = pasos[currentStep].tiempo;
+        unsigned long elapsedTime = millis() - tiempoInicioPaso;
+        int tiempo = paso.tiempo;
 
         if (elapsedTime >= tiempo * 1000) {
             stepInProgress = false;
