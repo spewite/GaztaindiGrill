@@ -51,13 +51,41 @@ void setup() {
     }
 }
 
-
-
 void loop() {
     if (!client.connected()) {
         connectToMQTT();
     }
     client.loop(); 
+
+    /// ----------------------------------- ///
+    ///          MANEJAR MODO DUAL          /// 
+    /// ----------------------------------- ///
+
+    if (grills[0]->modo == DUAL)
+    {
+
+        // ------------- ESTA ARRIBA ------------- //
+        bool esta_arriba_dual = grills[0]->esta_arriba() && grills[1]->esta_arriba();
+        grills[0]->esta_arriba_dual = esta_arriba_dual;
+
+        // ------------- DIRECCIONES ------------- //
+        DireccionDual direccion_dual = grills[0]->direccion_dual;
+        if (direccion_dual == ARRIBA)
+        {
+            grills[0]->subir();
+            grills[1]->subir();
+        }
+        if (direccion_dual == QUIETO)
+        {
+            grills[0]->parar();
+            grills[1]->parar();
+        }
+        if (direccion_dual == ABAJO)
+        {
+            grills[0]->bajar();
+            grills[1]->bajar();
+        }
+    }
 
     /// --------------------------------- ///
     ///       MANEJAR LAS PARADAS DE      /// 

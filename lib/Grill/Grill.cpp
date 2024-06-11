@@ -21,8 +21,14 @@ extern PubSubClient client;
 typedef bool (*MQTTPublishFunction)(const String&, const String&);
 
 
-Grill::Grill(int index) 
-    : index(index), encoder(nullptr), rotorEncoder(nullptr), drive(nullptr), rotor(nullptr), pt100(PIN_SPI_CS_GRILL_PT), lastEncoderValue(0), lastRotorEncoderValue(0), lastTemperatureValue(0), rotorVueltas(0), posicionObjetivo(SIN_OBJETIVO), gradosObjetivo(SIN_OBJETIVO), temperaturaObjetivo(SIN_OBJETIVO), numPasos(0), currentStep(0), stepInProgress(false), tiempoInicioPaso(0), cancelarPrograma(false) {}
+Grill::Grill(int index) :
+    index(index), 
+    encoder(nullptr), rotorEncoder(nullptr), drive(nullptr), rotor(nullptr), pt100(PIN_SPI_CS_GRILL_PT), // PERIFERIKUAK
+    lastEncoderValue(0), lastRotorEncoderValue(0), lastTemperatureValue(0), // LAST VALUES
+    rotor_vueltas(0), direccion_dual(QUIETO), modo(NORMAL), esta_arriba_dual(false), // DATUAK
+    posicionObjetivo(SIN_OBJETIVO), gradosObjetivo(SIN_OBJETIVO), temperaturaObjetivo(SIN_OBJETIVO), // GO_TO HELBURUAK
+    numPasosPrograma(0), pasoActualPrograma(0), pasoEnProgreso(false), tiempoInicioPaso(0), cancelarPrograma(false) // PROGRAMAK
+    {}
 
 bool Grill::setup_devices() {
 
@@ -36,15 +42,14 @@ bool Grill::setup_devices() {
     // ACTUADOR LINEAL
     drive = new CytronMD(PWM_DIR, PIN_GRILL_PWM[index], PIN_GRILL_DIR[index]);
 
-    // LIMIT SWITCH
-    pinMode(PIN_CS_LIMIT_SWITCH[index], INPUT_PULLUP);
+    // ACTUADOR LINEAL LIMIT SWITCH (RESETEATZEKO)
+    pinMode(PIN_CS_LIMIT_LINEAL[index], INPUT_PULLUP);
 
     // ROTOR ETA PT100 (EZKERREKUAK BAKARRIK DAZKAE)
     if (index == 0)
     {
-        Serial.print("ENTREAA");
         // Rotor
-        rotor = new DeviceRotorDrive(PIN_CS_ROTOR);
+        rotor = new DeviceRotorDrive(PIN_CS_LIMIT_ROTOR);
         
         // Rotor Encoder
         rotorEncoder = new DeviceEncoder(PIN_SPI_CS_ROTOR_ENC);
@@ -68,44 +73,14 @@ bool Grill::setup_devices() {
 void Grill::resetear_sistema() {
     
     // ------------- RESETEAR ROTOR ------------- //
-
     if (index == 0)
     {
-        imprimir("Reseteando el rotor");
-        rotor->go(ROTOR_ON);
-
-        while (!limit_switch_pulsado()) {}
-
-        rotor->stop();
-        resetear_encoder(rotorEncoder);
+        resetear_rotor();
     }
 
     // ------------- RESETEAR ACTUADOR LINEAL ------------- //
-    subir(); 
-    imprimir("Subiendo la parrilla");
-
-    // Variables para controlar el tiempo no bloqueante
-    unsigned long previousMessageMillis = 0;
-    const long messageInterval = 1000; // Intervalo de 1 segundo
-
-    while (!limit_switch_pulsado()) { // Oain rotorran berdiña da switcha, beste bat jarri
-
-        unsigned long currentMillis = millis();
-
-        // Comprobar si ha pasado 1 segundo desde el último mensaje
-        if (currentMillis - previousMessageMillis >= messageInterval) {
-            previousMessageMillis = currentMillis;
-            // Imprimir el mensaje
-            imprimir("Reseteando actuador lineal...");
-        }
-
-        // Asegurarse de que el cliente MQTT sigue funcionando
-        client.loop();
-    }
-
-    imprimir("esta arriba");
-    parar();
-
+    resetear_actuador_lineal();
+    
     // ------------- RESETEAR ENCODER ------------- //
     resetear_encoder(encoder);
     update_encoder();
@@ -131,7 +106,7 @@ int Grill::get_rotor_encoder_value()
         rotorEncoderValue = rotorEncoderValue % 360;
     }
 
-    rotorVueltas = abs(rotorEncoder->get_data())/360;
+    rotor_vueltas = abs(rotorEncoder->get_data())/360;
 
     return rotorEncoderValue;
 }
@@ -148,7 +123,7 @@ void Grill::update_rotor_encoder() {
     {
         Serial.println("Rotor Encoder = " + String(rotorEncoderValue));
         publicarMQTT(parse_topic("inclinacion"), String(rotorEncoderValue));
-        publicarMQTT(parse_topic("vueltas"), String(rotorVueltas));
+        publicarMQTT(parse_topic("vueltas"), String(rotor_vueltas));
     }
 }
 
@@ -206,21 +181,39 @@ void Grill::update_temperature() {
 /// -------------------------///
 
 void Grill::subir() {
-    drive->setSpeed(-255);
+    if (modo == DUAL)
+    {
+        direccion_dual = ARRIBA;
+    } else 
+    {
+        drive->setSpeed(-255);
+    }
 }
 
 void Grill::bajar() {
-    drive->setSpeed(255);
+     if (modo == DUAL)
+    {
+        direccion_dual = ABAJO;
+    } else 
+    {
+        drive->setSpeed(255);
+    }
 }
 
 void Grill::parar() {
-    drive->setSpeed(0);
+     if (modo == DUAL)
+    {
+        direccion_dual = QUIETO;
+    } else 
+    {
+        drive->setSpeed(0);
+    }
 }
 
 void Grill::voltear() {
     imprimir("Dando la vuelta");
     int inclinacionActual = get_rotor_encoder_value();
-    int inclinacionObjetivo = (inclinacionActual + 90) % 360;
+    int inclinacionObjetivo = (inclinacionActual + 180) % 360;
     go_to_rotor(inclinacionObjetivo);
 }
 
@@ -271,10 +264,9 @@ void Grill::manejar_parada_rotor() {
 
 void Grill::go_to(int posicion) {
 
-    if (posicion < 0 || posicion > 100) {
-        imprimir("Posición fuera de rango");
-        return;
-    }
+    if (posicion < 0) posicion = 0;
+    if (posicion > 100) posicion = 99;
+    
     posicionObjetivo = posicion;
     int currentPercentage = get_encoder_value();
 
@@ -293,11 +285,10 @@ void Grill::manejar_parada_encoder() {
     if (abs(currentPercentage - posicionObjetivo) <= margen && posicionObjetivo != SIN_OBJETIVO ) {
         parar();
         posicionObjetivo = SIN_OBJETIVO;
-        stepInProgress = true; // Marca que el paso está en progreso después de alcanzar la posición
+        pasoEnProgreso = true; // Marca que el paso está en progreso después de alcanzar la posición
         tiempoInicioPaso = millis(); // Comienza a contar el tiempo ahora
     } 
 }
-
 
 // ------------- PT100 ------------- //
 
@@ -321,22 +312,61 @@ void Grill::manejar_parada_temperatura() {
     if (abs(currentTemperature - temperaturaObjetivo) <= margen && temperaturaObjetivo != SIN_OBJETIVO ) {
         parar();
         temperaturaObjetivo = SIN_OBJETIVO;
-        stepInProgress = true; // Marca que el paso está en progreso después de alcanzar la temperatura
+        pasoEnProgreso = true; // Marca que el paso está en progreso después de alcanzar la temperatura
         tiempoInicioPaso = millis(); // Comienza a contar el tiempo ahora
     } 
 }
 
-/// ------------------------------------ ///
-///         PERIFERICOS EXTRA FUN        /// 
-/// ------------------------------------ ///
+/// ------------------------------------  ///
+///         PERIFERICOS EXTRA FUNC        /// 
+/// ------------------------------------  ///
+
+bool Grill::esta_arriba()
+{
+    return (modo == DUAL) ? esta_arriba_dual : limit_switch_pulsado(PIN_CS_LIMIT_LINEAL[index]);
+}
+
+void Grill::resetear_rotor()
+{
+    imprimir("Reseteando el rotor");
+    rotor->go(ROTOR_ON);
+
+    while (!limit_switch_pulsado(PIN_CS_LIMIT_ROTOR)) {}
+
+    rotor->stop();
+    resetear_encoder(rotorEncoder);
+}
+
+void Grill::resetear_actuador_lineal()
+{
+    subir(); 
+    imprimir("Subiendo la parrilla");
+
+    // Mensajia ez imprimitzen eoteko denboa guztiyan, pausa bat hilua blokeatu gabe (MQTT ENTZUN AHAL IZATEKO)
+    unsigned long previousMessageMillis = 0;
+    const long messageInterval = 1000; // 1 segunduko pausa
+
+    while (!esta_arriba()) {
+
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMessageMillis >= messageInterval) {
+            previousMessageMillis = currentMillis;
+            imprimir("Reseteando actuador lineal...");
+        }
+        client.loop();
+    }
+
+    imprimir("esta arriba");
+    parar();
+}
 
 void Grill::resetear_encoder(DeviceEncoder* selected_encoder) {
     // Parametrotik pasatzezaio zein encoder nahideun reseteatu, hola ezdet beste metodo bat inber RotorEncoder reseteatzeko.
     selected_encoder->reset_counter(0);
 }
 
-bool Grill::limit_switch_pulsado() {
-    return digitalRead(PIN_CS_LIMIT_SWITCH[index]) == LOW;
+bool Grill::limit_switch_pulsado(const int CS_LIMIT_SWITCH) {
+    return digitalRead(CS_LIMIT_SWITCH) == LOW;
 }
 
 /// ----------------------///
@@ -366,7 +396,7 @@ void Grill::subscribe_topics() {
         return;
     }
 
-    const char* topics[] = {"log", "reiniciar", "dirigir", "establecer_posicion", "ejecutar_programa", "cancelar_programa", "inclinar", "dirigir_rotor"};
+    const char* topics[] = {"log", "reiniciar", "dirigir", "establecer_posicion", "ejecutar_programa", "cancelar_programa", "inclinar", "dirigir_rotor", "establecer_modo"};
     const int numTopics = sizeof(topics) / sizeof(topics[0]);
 
     for (int i = 0; i < numTopics; ++i) {
@@ -393,27 +423,64 @@ void Grill::handleMQTTMessage(const char* pAccion, const char* pPayload) {
         } else if (payload == "parar") {
             parar();
         }
-    } else if (accion == "establecer_posicion") {
+    }
+    
+    if (accion == "establecer_posicion") {
         int posicion = payload.toInt();
         go_to(posicion);
-    } else if (accion == "reiniciar") {
+    }
+    
+    if (accion == "reiniciar") {
         imprimir("Reiniciando sistema");
-    } else if (accion == "ejecutar_programa") {
+    }
+    
+    if (accion == "ejecutar_programa") {
         executeProgram(pPayload);
-    } else if (accion == "cancelar_programa") {
+    }
+    
+    if (accion == "cancelar_programa") {
         cancelarPrograma = true;
         imprimir("Programa cancelado");
-    } else if (accion == "inclinar")
+    }
+    
+    if (accion == "inclinar")
     {
         int grados = payload.toInt();
         go_to_rotor(grados);
-    } else if (accion == "dirigir_rotor")
+    }
+    
+    if (accion == "dirigir_rotor")
     {
         if (payload == "rotar") {
             rotar();
-        } else if (payload == "parar_rotor") {
+        }
+        
+        if (payload == "parar_rotor") {
             parar_rotor();
         } 
+    }
+    
+    if (accion = "establecer_modo")
+    {
+        if (payload == "normal")
+        {
+            modo = NORMAL;
+            parar();
+            resetear_rotor();
+        }
+        
+        if (payload == "burruntzi") 
+        {
+            modo = BURRUNTZI;
+            parar();
+            parar_rotor();
+        }
+        
+        if (payload == "dual")
+        {
+            // Modo duala GaztaindiGrill.cpp (main)-etik kontrolatuko da.
+            modo = DUAL;
+        }
     }
 }
 
@@ -432,9 +499,9 @@ void Grill::executeProgram(const char* program) {
     Serial.println();
 
     JsonArray array = doc.as<JsonArray>();
-    numPasos = array.size();
+    numPasosPrograma = array.size();
     
-    for (int i = 0; i < numPasos; i++) {
+    for (int i = 0; i < numPasosPrograma; i++) {
         JsonObject paso = array[i];
         if (paso.containsKey("tiempo") && paso.containsKey("temperatura")) {
             pasos[i] = {paso["tiempo"], paso["temperatura"], -1, nullptr};
@@ -446,8 +513,8 @@ void Grill::executeProgram(const char* program) {
     }
 
     // Inicializar variables de estado
-    currentStep = 0;
-    stepInProgress = false;
+    pasoActualPrograma = 0;
+    pasoEnProgreso = false;
     tiempoInicioPaso = millis();
     cancelarPrograma = false; // Reiniciar la bandera de cancelación al iniciar un nuevo programa
 }
@@ -460,13 +527,13 @@ void Grill::update_programa() {
         return; // Salir si el programa ha sido cancelado
     }
 
-    if (currentStep >= numPasos) {
+    if (pasoActualPrograma >= numPasosPrograma) {
         return; // No hay más pasos que ejecutar
     }
 
-    Paso& paso = pasos[currentStep];
+    Paso& paso = pasos[pasoActualPrograma];
 
-    if (!stepInProgress) {
+    if (!pasoEnProgreso) {
         if (paso.accion) {
             Serial.print("Executing step - Accion: ");
             Serial.println(paso.accion);
@@ -475,7 +542,7 @@ void Grill::update_programa() {
                 voltear();
             }
 
-            currentStep++;
+            pasoActualPrograma++;
         } else {
             if (paso.temperatura != -1) {
                 go_to_temp(paso.temperatura);
@@ -486,12 +553,12 @@ void Grill::update_programa() {
             }
         }
     } else {
-        unsigned long elapsedTime = millis() - tiempoInicioPaso;
+        unsigned long tiempoTranscurridoPaso = millis() - tiempoInicioPaso;
         int tiempo = paso.tiempo;
 
-        if (elapsedTime >= tiempo * 1000) {
-            stepInProgress = false;
-            currentStep++;
+        if (tiempoTranscurridoPaso >= tiempo * 1000) {
+            pasoEnProgreso = false;
+            pasoActualPrograma++;
         }
     }
 }

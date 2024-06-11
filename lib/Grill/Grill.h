@@ -25,12 +25,20 @@ enum Modo {
     DUAL
 };
 
+enum DireccionDual {
+    ARRIBA,
+    QUIETO,
+    ABAJO
+};
+
 class Grill {
 public:
     Grill(int index);
 
+    bool esta_arriba_dual;
     bool setup_devices();
     void resetear_sistema();
+    bool esta_arriba();
 
     // ----------------- GETTERS ----------------- //
     int get_rotor_encoder_value();
@@ -57,6 +65,9 @@ public:
     void go_to_temp(int temperatura);
     void go_to_rotor(int grados);
 
+    DireccionDual direccion_dual;
+    Modo modo;
+
     // ---- MANEJAR PARADAS (GO_TO / PROGRAMA) ---- //
     void manejar_parada_rotor();
     void manejar_parada_encoder();
@@ -78,9 +89,8 @@ private:
     Adafruit_MAX31865 pt100;
 
     int index;
-    bool modo;
-    int rotorVueltas;
-
+    int rotor_vueltas;
+    
     // ----------------- LAST VALUES --------------- //
     long lastEncoderValue;
     int lastRotorEncoderValue;
@@ -88,12 +98,13 @@ private:
 
     // ------------------- RESETS ------------------ //
     void resetear_rotor();
+    bool limit_switch_pulsado(const int cs_limit_switch);
+    void resetear_actuador_lineal();
     void resetear_encoder(DeviceEncoder* sel_encoder);
-    bool limit_switch_pulsado();
 
     // -------------------- MQTT ------------------- //
-    String parse_topic(String accion);
     void imprimir(String msg);
+    String parse_topic(String accion);
     bool publicarMQTT(const String& topic, const String& payload);
 
     // -------------- GO_TO OBJETIBUAK ------------- //

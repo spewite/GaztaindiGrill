@@ -28,8 +28,8 @@ const int PIN_SPI_CS_ROTOR_ENC   = 15;
 const int PIN_GRILL_PWM[]        = {33, 25}; //  {25, 32}
 const int PIN_GRILL_DIR[]        = {35, 32}; //  {26, 33}
  
-const int PIN_CS_ROTOR           = 14;
-const int PIN_CS_LIMIT_SWITCH[]  = {27, 0};
+const int PIN_CS_LIMIT_ROTOR      = 14;
+const int PIN_CS_LIMIT_LINEAL []  = {27, 0};
 // const int PIN_CUALQUIERCOSA      = 00;
 
 //====================================================================================
