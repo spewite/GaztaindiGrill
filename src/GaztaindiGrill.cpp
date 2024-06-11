@@ -21,10 +21,10 @@ PubSubClient client(wifiClient);
 
 Grill* grills[NUM_GRILLS];
 
-unsigned long previousMillis = 0; 
-const long interval = 3000; // Intervalo de 5 segundos
+unsigned long previousMillisTemp = 0; 
+const long intervalTemp = 3000; // Temperaturan estadua aktualizatzeko pausa, MQTT ez kargatzeko.
 
-// Declaración de funciones
+// Funtziyuak lenuotik deklaratu, bestela erroria emateu.
 void connectToWiFi();
 void connectToMQTT();
 void handleMQTTCallback(char* topic, byte* payload, unsigned int length);
@@ -35,7 +35,7 @@ void setup() {
     SPI.begin();
 
     connectToWiFi();
-    client.setCallback(handleMQTTCallback); // Mover esta línea antes de connectToMQTT
+    client.setCallback(handleMQTTCallback);
     connectToMQTT();
 
     for (int i = 0; i < NUM_GRILLS; ++i) {
@@ -51,30 +51,45 @@ void setup() {
     }
 }
 
+
+
 void loop() {
     if (!client.connected()) {
         connectToMQTT();
     }
     client.loop(); 
 
+    /// --------------------------------- ///
+    ///       MANEJAR LAS PARADAS DE      /// 
+    ///        LOS GO_TO / PROGRAMA       /// 
+    /// --------------------------------- ///
+
+    grills[0]->manejar_parada_rotor();
+    grills[0]->manejar_parada_encoder(); 
+    grills[0]->manejar_parada_temperatura(); 
+    grills[0]->update_programa();
+
+    /// -------------------------------- ///
+    ///          HOME ASSISTANTEKO       /// 
+    ///        ESTADUAK AKTUALIZATU      /// 
+    /// -------------------------------- ///
+
     grills[0]->update_rotor_encoder();
     grills[0]->update_encoder();
 
-    grills[0]->manejar_parada_rotor(); // Parar si ha llegado al objetivo en go_to_rotor
-    grills[0]->manejar_parada_encoder(); // Parar si ha llegado al objetivo en go_to_
-    grills[0]->manejar_parada_temperatura(); // Parar si ha llegado al objetivo en go_to_temp
-    grills[0]->update_programa(); // Ejecutar los pasos de los programas
-
-    unsigned long currentMillis = millis();
-
-    // Leer la tempeartura cada 3 para evitar la sobrecarga
-    if (currentMillis - previousMillis >= interval) {
+    // Temperatura irakutzeko pausa, MQTT ez kargatzeko.
+    unsigned long currentMillisTemp = millis();
+    if (currentMillisTemp - previousMillisTemp >= intervalTemp) {
         // Guardar el tiempo actual
-        previousMillis = currentMillis;
+        previousMillisTemp = currentMillisTemp;
 
         grills[0]->update_temperature(); // Kontuan euki ezkerreko parrillak bakarrik eukikoula pt100
     }
 }
+
+/// -------------------------------- ///
+///             MQTT & WIFI          /// 
+/// -------------------------------- ///
 
 void connectToWiFi() {
     WiFi.begin(ssid, password);
@@ -112,9 +127,9 @@ void handleMQTTCallback(char* topic, byte* payload, unsigned int length) {
     memcpy(mensaje, payload, length);
     mensaje[length] = '\0';
 
-    // Extraer id y accion del topic asumiendo el formato "grill/{id}/{accion}"
+    // Akziyua, eta akziyua dagokion parrilla atea, formatua hau dala kontuan izanda: "grill/{id}/{accion}" 
     int id;
-    char accion[120]; // Asumiendo que el tamaño de 'accion' no superará los 20 caracteres
+    char accion[120]; // MQTT topic batek ezin du array honen dimentsiyua baño handiyo izan.
     sscanf(topic, "grill/%d/%s", &id, accion);
 
     // Verificar que el id es válido antes de usarlo
