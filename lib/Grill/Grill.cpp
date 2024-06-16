@@ -75,7 +75,7 @@ void Grill::resetear_sistema() {
     // ------------- RESETEAR ROTOR ------------- //
     if (index == 0)
     {
-        resetear_rotor();
+        // resetear_rotor();
     }
 
     // ------------- RESETEAR ACTUADOR LINEAL ------------- //

@@ -9,9 +9,9 @@
 
 #define NUM_GRILLS 1
 
-const char* ssid = "EUSKALTEL2";
-const char* password = "3313GAZTAINDI3313";
-const char* mqttServer = "192.168.68.64"; 
+const char* ssid = "WiFi-Gaztaindi";
+const char* password = "GAZTAINDI";
+const char* mqttServer = "192.168.1.62"; 
 const int mqttPort = 1883;
 const char* mqttUser = "gaztaindi";
 const char* mqttPassword = "gaztaindi";

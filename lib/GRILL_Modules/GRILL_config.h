@@ -14,29 +14,36 @@ GRILL_Config.h
 //====================================================================================
 //   ESP32 PINOUTS
 //====================================================================================
+
+// PINS 34, 35, 36, 39 INT ONLY!
+
 // PINS SPI
 const int PIN_SPI_MISO       = 19;
 const int PIN_SPI_MOSI       = 23;
 const int PIN_SPI_SCK        = 18;
 
 // SPI SELEC Pt100 MAX31865
-const int PIN_SPI_CS_GRILL_PT    = 13;
+const int PIN_SPI_CS_GRILL_PT    = 14;
 
-// SPI SELEC Encoders
-const int PIN_SPI_CS_GRILL_ENC[] = {2, 4}; // Default: 2, 12, 13
-const int PIN_SPI_CS_ROTOR_ENC   = 15;  
+// SPI SELEC Encoders (ONA!)
+// const int PIN_SPI_CS_GRILL_ENC[] = {17, 5}; // Ezkerra: CS2, Eskubi CS3
+// const int PIN_SPI_CS_ROTOR_ENC   = 16;     // CS: 1  
+
+// SPI SELEC Encoders (TEST!)
+const int PIN_SPI_CS_GRILL_ENC[] = {5, 17}; // Ezkerra: CS2, Eskubi CS3
+const int PIN_SPI_CS_ROTOR_ENC   = 16;     // CS: 1  
+
 
 // Grill Linear Motor drive
-const int PIN_GRILL_PWM[]        = {33, 25}; //  {25, 32}
-const int PIN_GRILL_DIR[]        = {35, 32}; //  {26, 33}
+const int PIN_GRILL_PWM[]        = {33, 26}; 
+const int PIN_GRILL_DIR[]        = {25, 27}; 
  
 // Rotor 
-const int PIN_CS_ROTOR           = 34;
+const int PIN_CS_ROTOR           = 32;
 
 // Limit  
-const int PIN_CS_LIMIT_ROTOR      = 14;
-const int PIN_CS_LIMIT_LINEAL []  = {27, 0};
-// const int PIN_CUALQUIERCOSA      = 00;
+const int PIN_CS_LIMIT_ROTOR      = 4;
+const int PIN_CS_LIMIT_LINEAL []  = {2, 15};
 
 //====================================================================================
 //   ENCODERS
