@@ -49,7 +49,7 @@ bool Grill::setup_devices() {
     if (index == 0)
     {
         // Rotor
-        rotor = new DeviceRotorDrive(PIN_CS_LIMIT_ROTOR);
+        rotor = new DeviceRotorDrive(PIN_CS_ROTOR);
         
         // Rotor Encoder
         rotorEncoder = new DeviceEncoder(PIN_SPI_CS_ROTOR_ENC);
