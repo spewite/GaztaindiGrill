@@ -84,7 +84,7 @@ void Grill::resetear_sistema() {
     // ------------- RESETEAR ENCODER ------------- //
     resetear_encoder(encoder);
     update_encoder();
-// test commit
+
     imprimir("Dispositivos calibrados");  
 }
 
