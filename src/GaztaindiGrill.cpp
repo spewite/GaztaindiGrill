@@ -1,4 +1,4 @@
-#include <Arduino.h> 
+#include <Arduino.h>  
 #include <Wire.h>
 #include <SPI.h>
 #include <WiFi.h>
@@ -7,12 +7,12 @@
 #include <GRILL_config.h>
 #include <Grill.h>
 
-#define NUM_GRILLS 1
+#define NUM_GRILLS 2
 
 const char* ssid = "WiFi-Gaztaindi";
-const char* password = "GAZTAINDI";
+const char* password = "";
 const char* mqttServer = "192.168.1.62"; 
-const int mqttPort = 1883;
+const int mqttPort = 1883;  
 const char* mqttUser = "gaztaindi";
 const char* mqttPassword = "gaztaindi";
 
@@ -22,7 +22,7 @@ PubSubClient client(wifiClient);
 Grill* grills[NUM_GRILLS];
 
 unsigned long previousMillisTemp = 0; 
-const long intervalTemp = 3000; // Temperaturan estadua aktualizatzeko pausa, MQTT ez kargatzeko.
+const long intervalTemp = 1500; // Temperaturan estadua aktualizatzeko pausa, MQTT ez kargatzeko.
 
 // Funtziyuak lenuotik deklaratu, bestela erroria emateu.
 void connectToWiFi();
@@ -52,16 +52,17 @@ void setup() {
 }
 
 void loop() {
+
     if (!client.connected()) {
         connectToMQTT();
     }
-    client.loop(); 
-
+    client.loop();  
+ 
     /// ----------------------------------- ///
     ///          MANEJAR MODO DUAL          /// 
     /// ----------------------------------- ///
 
-    if (grills[0]->modo == DUAL)
+    if (grills[0]-> modo == DUAL)
     {
 
         // ------------- ESTA ARRIBA ------------- //
@@ -86,33 +87,41 @@ void loop() {
             grills[1]->bajar();
         }
     }
-
-    /// --------------------------------- ///
-    ///       MANEJAR LAS PARADAS DE      /// 
-    ///        LOS GO_TO / PROGRAMA       /// 
-    /// --------------------------------- ///
-
+      
+    // ---- ROTOR ---- //
+    // Ezkerreko parrillak bakarrik daka rotorra
     grills[0]->manejar_parada_rotor();
-    grills[0]->manejar_parada_encoder(); 
-    grills[0]->manejar_parada_temperatura(); 
-    grills[0]->update_programa();
+    grills[0]->update_rotor_encoder();   
+    
+    for (int i = 0; i < NUM_GRILLS; ++i) 
+    {
+        /// --------------------------------- ///
+        ///       MANEJAR LAS PARADAS DE      /// 
+        ///        LOS GO_TO / PROGRAMA       /// 
+        /// --------------------------------- ///
 
-    /// -------------------------------- ///
-    ///          HOME ASSISTANTEKO       /// 
-    ///        ESTADUAK AKTUALIZATU      /// 
-    /// -------------------------------- ///
+        grills[i]->manejar_parada_encoder(); 
+        grills[i]->update_programa();    
+    
+        /// -------------------------------- ///
+        ///          HOME ASSISTANTEKO       /// 
+        ///        ESTADUAK AKTUALIZATU      /// 
+        /// -------------------------------- ///
 
-    grills[0]->update_rotor_encoder();
-    grills[0]->update_encoder();
+        grills[i]->update_encoder(); 
+    }
 
+    // ---- TEMPERATURA ---- //
+
+    // grills[0]->manejar_parada_temperatura(); 
+     
     // Temperatura irakutzeko pausa, MQTT ez kargatzeko.
     unsigned long currentMillisTemp = millis();
     if (currentMillisTemp - previousMillisTemp >= intervalTemp) {
         // Guardar el tiempo actual
-        previousMillisTemp = currentMillisTemp;
-
-        grills[0]->update_temperature(); // Kontuan euki ezkerreko parrillak bakarrik eukikoula pt100
-    }
+        // grills[0]->update_temperature(); // Kontuan euki ezkerreko parrillak bakarrik eukikoula pt100
+    }   
+     
 }
 
 /// -------------------------------- ///

@@ -1,29 +1,22 @@
-/*
--------------------------------------------------------------------------------------
-DeviceRotorDrive.h
-  This Header define api for rotary motor drive.
- 
- Mar 2021
- Inaki Etxebarria
--------------------------------------------------------------------------------------
-*/
 
-#include <WiFi.h>
+#ifndef DEVICEROTORDRIVE_H
+#define DEVICEROTORDRIVE_H
 
-enum rotorstate {ROTOR_ON=1, ROTOR_OFF=0};
+#include <Arduino.h>
 
 class DeviceRotorDrive {
-	private:
-		int _pin_onoff;
-		rotorstate _onoff;
-		inline bool _low_high(rotorstate onoff) const { return (onoff == ROTOR_ON ? HIGH : LOW); };
-	public:
-		DeviceRotorDrive();
-		DeviceRotorDrive(int);
-		void stop(void);
-		void go(rotorstate);
-		inline rotorstate get_state(void) const { return _onoff; };
+  private:
+    int _pinIN3;
+    int _pinIN4;
+    int _pinENB;
+
+  public:
+    DeviceRotorDrive();
+    DeviceRotorDrive(int pinIN3, int pinIN4, int pinENB);
+
+    void stop(void);
+    void rotateClockwise(void);
+    void rotateCounterClockwise(void);
 };
 
-
-
+#endif // DEVICEROTORDRIVE_H

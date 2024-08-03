@@ -10,7 +10,9 @@
 #include <GRILL_config.h>
 #include <DeviceEncoder.h>
 #include <CytronMotorDriver.h>
-#include <Adafruit_MAX31865.h>
+// #include <Adafruit_MAX31865.h>  
+#include <Adafruit_MAX31855.h>
+
 #include <DeviceRotorDrive.h>
  
 // Definir RNOMINAL y RREF
@@ -57,8 +59,10 @@ public:
     void parar();
 
     void voltear();   
-    void rotar();
+    void rotar_horario();
+    void rotar_antihorario();
     void parar_rotor();
+    bool limit_switch_pulsado(const int cs_limit_switch);
 
     // ------------------- GO_TO ------------------ //
     void go_to(int posicion);
@@ -86,10 +90,9 @@ private:
     DeviceEncoder* encoder;
     DeviceEncoder* rotorEncoder;
     DeviceRotorDrive* rotor;
-    Adafruit_MAX31865 pt100;
+    Adafruit_MAX31855* thermocouple;
 
     int index;
-    int rotor_vueltas;
     
     // ----------------- LAST VALUES --------------- //
     long lastEncoderValue;
@@ -98,7 +101,6 @@ private:
 
     // ------------------- RESETS ------------------ //
     void resetear_rotor();
-    bool limit_switch_pulsado(const int cs_limit_switch);
     void resetear_actuador_lineal();
     void resetear_encoder(DeviceEncoder* sel_encoder);
 
@@ -113,16 +115,19 @@ private:
     int posicionObjetivo;  
 
     // ----------------- PROGRAMAK ----------------- //
+    void cancelar_programa();
+    
     struct Paso {
         int tiempo;
         int temperatura;
         int posicion;
+        int rotacion;
         const char* accion;
     };
     Paso pasos[25]; // Programa batek dazkan pausu maximuak
     int numPasosPrograma;
     int pasoActualPrograma;
-    bool pasoEnProgreso;
+    bool objetivoAlcanzado;
     bool cancelarPrograma; 
     unsigned long tiempoInicioPaso;
 };

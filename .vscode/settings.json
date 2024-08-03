@@ -2,5 +2,6 @@
     "files.associations": {
         "string_view": "cpp",
         "new": "cpp"
-    }
+    },
+    "cmake.sourceDirectory": "C:/Users/Izeta/Documents/Gaztaindi/Parrilla/Neria/Programak/GaztaindiGrill/lib/ArduinoJson"
 }

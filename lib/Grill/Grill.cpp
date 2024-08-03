@@ -17,20 +17,22 @@ extern PubSubClient client;
 #define ENCODER_ERROR -9999.0 // Definir un valor especial que represente cuando el encoder lee mal un valor.
 #define SIN_OBJETIVO -999 // Definir un valor cuando no se tiene ningun objetivo en go_to
 
-// Definir un tipo de función para la publicación MQTT
-typedef bool (*MQTTPublishFunction)(const String&, const String&);
+// // Definir un tipo de función para la publicación MQTT
+// typedef bool (*MQTTPublishFunction)(const String&, const String&);
 
 
 Grill::Grill(int index) :
     index(index), 
-    encoder(nullptr), rotorEncoder(nullptr), drive(nullptr), rotor(nullptr), pt100(PIN_SPI_CS_GRILL_PT), // PERIFERIKUAK
+    encoder(nullptr), rotorEncoder(nullptr), drive(nullptr), rotor(nullptr), thermocouple(nullptr), // PERIFERIKUAK
     lastEncoderValue(0), lastRotorEncoderValue(0), lastTemperatureValue(0), // LAST VALUES
-    rotor_vueltas(0), direccion_dual(QUIETO), modo(NORMAL), esta_arriba_dual(false), // DATUAK
+    direccion_dual(QUIETO), modo(NORMAL), esta_arriba_dual(false), // DATUAK
     posicionObjetivo(SIN_OBJETIVO), gradosObjetivo(SIN_OBJETIVO), temperaturaObjetivo(SIN_OBJETIVO), // GO_TO HELBURUAK
-    numPasosPrograma(0), pasoActualPrograma(0), pasoEnProgreso(false), tiempoInicioPaso(0), cancelarPrograma(false) // PROGRAMAK
+    numPasosPrograma(0), pasoActualPrograma(0), objetivoAlcanzado(false), tiempoInicioPaso(0), cancelarPrograma(false) // PROGRAMAK
     {}
 
 bool Grill::setup_devices() {
+   
+    imprimir("Configurando los dispositivos de la parrilla " + String(index));
 
     // ENCODER
     encoder = new DeviceEncoder(PIN_SPI_CS_GRILL_ENC[index]);
@@ -45,26 +47,31 @@ bool Grill::setup_devices() {
     // ACTUADOR LINEAL LIMIT SWITCH (RESETEATZEKO)
     pinMode(PIN_CS_LIMIT_LINEAL[index], INPUT_PULLUP);
 
+    // ROTOR LIMIT SWITCH (RESETEATZEKO)
+    pinMode(PIN_CS_LIMIT_ROTOR, INPUT_PULLUP);
+
     // ROTOR ETA PT100 (EZKERREKUAK BAKARRIK DAZKAE)
     if (index == 0)
     {
         // Rotor
-        rotor = new DeviceRotorDrive(PIN_CS_ROTOR);
+        rotor = new DeviceRotorDrive(PIN_EN3, PIN_EN4, PIN_ENB);
         
         // Rotor Encoder
         rotorEncoder = new DeviceEncoder(PIN_SPI_CS_ROTOR_ENC);
-        if (!rotorEncoder->begin(PULSES_ENCODER_ROTOR, DATA_INTERVAL_ROTOR, false)) {
+        if (!rotorEncoder->begin(PULSES_ENCODER_ROTOR, DATA_INTERVAL_ROTOR, true)) {
             imprimir("Error Begin Rotor Encoder");
             return false;
         }
 
-        // Pt100
-        pinMode(PIN_SPI_CS_GRILL_PT, OUTPUT);
-        digitalWrite(PIN_SPI_CS_GRILL_PT, HIGH);
-        if (!pt100.begin(MAX31865_4WIRE)) {
-            imprimir("Error Begin Pt100");
-            return false;
-        }
+        // Termopar
+        // pinMode(PIN_SPI_CS_GRILL_PT, OUTPUT);
+        // digitalWrite(PIN_SPI_CS_GRILL_PT, HIGH);
+        // thermocouple = new Adafruit_MAX31855(PIN_SPI_SCK, PIN_SPI_CS_GRILL_PT, PIN_SPI_MISO);
+        // SPI.beginTransaction((SPISettings(1000000, MSBFIRST, SPI_MODE0))); // Use SPI settings
+        // if (!thermocouple->begin()) {
+        //     imprimir("Error Begin Thermocouple");
+        //     return false;
+        // }
     }
 
     return true;
@@ -72,10 +79,12 @@ bool Grill::setup_devices() {
 
 void Grill::resetear_sistema() {
     
+    imprimir("Reseteando los dispositivos de la parrilla " + String(index));   
+
     // ------------- RESETEAR ROTOR ------------- //
     if (index == 0)
     {
-        // resetear_rotor();
+        // resetear_rotor(); 
     }
 
     // ------------- RESETEAR ACTUADOR LINEAL ------------- //
@@ -86,6 +95,7 @@ void Grill::resetear_sistema() {
     update_encoder();
 
     imprimir("Dispositivos calibrados");  
+    
 }
 
 /// -------------------------- ///
@@ -94,27 +104,22 @@ void Grill::resetear_sistema() {
 /// -------------------------- ///
 
 // ------------- ROTOR ENCODER ------------- //
+ 
 
 int Grill::get_rotor_encoder_value()
-{
-    int rotorEncoderValue = abs(rotorEncoder->get_data());
-
+{  
+    int rotorEncoderValue = rotorEncoder->get_data();
+     
+    if (rotorEncoderValue<0) { rotorEncoderValue+=360; }  
     if (rotorEncoderValue == 0) return lastRotorEncoderValue;
-    
-    while (rotorEncoderValue>=360)
-    {
-        rotorEncoderValue = rotorEncoderValue % 360;
-    }
-
-    rotor_vueltas = abs(rotorEncoder->get_data())/360;
-
+ 
     return rotorEncoderValue;
 }
 
 void Grill::update_rotor_encoder() { 
 
     int rotorEncoderValue = get_rotor_encoder_value();
-
+    
     if (rotorEncoderValue == lastRotorEncoderValue) { return; }
     lastRotorEncoderValue = rotorEncoderValue;
 
@@ -123,7 +128,6 @@ void Grill::update_rotor_encoder() {
     {
         Serial.println("Rotor Encoder = " + String(rotorEncoderValue));
         publicarMQTT(parse_topic("inclinacion"), String(rotorEncoderValue));
-        publicarMQTT(parse_topic("vueltas"), String(rotor_vueltas));
     }
 }
 
@@ -140,14 +144,13 @@ long Grill::get_encoder_real_value() {
 }
 
 long Grill::get_encoder_value() {
-    return 100-get_encoder_real_value();
+    return encoder->get_data();
 }
 
 void Grill::update_encoder() {
     long encoderValue = get_encoder_real_value();
     if (encoderValue == ENCODER_ERROR || encoderValue == lastEncoderValue) { return; }
     lastEncoderValue = encoderValue;
-    encoderValue = 100 - encoderValue;
 
     String encoderValueStr = String(encoderValue);
     String stringTopicEncoder = parse_topic("posicion");
@@ -158,10 +161,11 @@ void Grill::update_encoder() {
 // ------------- PT 100 ------------- //
 
 int Grill::get_temperature() {
-    float temperature;
-    digitalWrite(PIN_SPI_CS_GRILL_PT, LOW);
-    temperature = pt100.temperature(RNOMINAL, RREF);
-    digitalWrite(PIN_SPI_CS_GRILL_PT, HIGH);
+    double temperature = thermocouple->readCelsius();
+    if (isnan(temperature)) {
+        imprimir("Error reading temperature!");
+        return -1;
+    }
     return (int) temperature;
 }
 
@@ -191,7 +195,7 @@ void Grill::subir() {
 }
 
 void Grill::bajar() {
-     if (modo == DUAL)
+    if (modo == DUAL)
     {
         direccion_dual = ABAJO;
     } else 
@@ -201,7 +205,7 @@ void Grill::bajar() {
 }
 
 void Grill::parar() {
-     if (modo == DUAL)
+    if (modo == DUAL)
     {
         direccion_dual = QUIETO;
     } else 
@@ -221,9 +225,14 @@ void Grill::voltear() {
 ///            ROTOR         /// 
 /// -------------------------///
 
-void Grill::rotar()
+void Grill::rotar_horario()
 {
-    rotor->go(ROTOR_ON);
+    rotor->rotateClockwise();
+}
+
+void Grill::rotar_antihorario()
+{
+    rotor->rotateCounterClockwise();
 }
 
 void Grill::parar_rotor()
@@ -242,21 +251,34 @@ void Grill::go_to_rotor(int grados) {
     if (grados < 0 || grados >= 360) {
         imprimir("Grados fuera de rango");
         return;
-    }
+    }  
+     
+    int posicionActual = get_rotor_encoder_value();
     gradosObjetivo = grados;
-
-    // En la funcion manejar_parada_rotor(), que se llamada en loop, manejamos cuando tenemos que parar.
-    rotor->go(ROTOR_ON);
+     
+    int diferenciaDerecha = (gradosObjetivo - posicionActual + 360) % 360;
+    int diferenciaIzquierda = (posicionActual - gradosObjetivo + 360) % 360;
+     
+    // En la funcion manejar_parada_rotor(), que se llamada en loop, manejamos cuando tenemos que parar
+    if (diferenciaDerecha<diferenciaIzquierda) 
+    {
+        rotar_antihorario();
+    } else 
+    {
+        rotar_horario();
+    }
 }
 
 void Grill::manejar_parada_rotor() {
     
     int posicionActual = get_rotor_encoder_value();
-    int margen = 0;
+    int margen = 3;
 
-    if (posicionActual == gradosObjetivo && gradosObjetivo != SIN_OBJETIVO ) { 
-        rotor->stop();
+    if (abs(posicionActual-gradosObjetivo) <= margen && gradosObjetivo != SIN_OBJETIVO ) { 
+        parar_rotor();
         gradosObjetivo = SIN_OBJETIVO;
+        objetivoAlcanzado = true; // Marca que el paso está en progreso después de alcanzar la posición
+        tiempoInicioPaso = millis(); // Comienza a contar el tiempo ahora
     } 
 }
 
@@ -268,8 +290,10 @@ void Grill::go_to(int posicion) {
     if (posicion > 100) posicion = 99;
     
     posicionObjetivo = posicion;
-    int currentPercentage = get_encoder_value();
+    int currentPercentage = get_encoder_real_value();
 
+    // imprimir("posicion objetivo: " + String(posicionObjetivo) + " | posicion actual: " + String(currentPercentage) );
+  
     // En la funcion manejar_parada_encoder(), que se llamada en loop, manejamos cuando tenemos que parar.
     if (currentPercentage < posicion) {
         subir();
@@ -279,13 +303,13 @@ void Grill::go_to(int posicion) {
 }
 
 void Grill::manejar_parada_encoder() {
-    int currentPercentage = get_encoder_value();
+    int currentPercentage = get_encoder_real_value();
     int margen = 2;
 
     if (abs(currentPercentage - posicionObjetivo) <= margen && posicionObjetivo != SIN_OBJETIVO ) {
         parar();
         posicionObjetivo = SIN_OBJETIVO;
-        pasoEnProgreso = true; // Marca que el paso está en progreso después de alcanzar la posición
+        objetivoAlcanzado = true; // Marca que el paso está en progreso después de alcanzar la posición
         tiempoInicioPaso = millis(); // Comienza a contar el tiempo ahora
     } 
 }
@@ -312,7 +336,7 @@ void Grill::manejar_parada_temperatura() {
     if (abs(currentTemperature - temperaturaObjetivo) <= margen && temperaturaObjetivo != SIN_OBJETIVO ) {
         parar();
         temperaturaObjetivo = SIN_OBJETIVO;
-        pasoEnProgreso = true; // Marca que el paso está en progreso después de alcanzar la temperatura
+        objetivoAlcanzado = true; // Marca que el paso está en progreso después de alcanzar la temperatura
         tiempoInicioPaso = millis(); // Comienza a contar el tiempo ahora
     } 
 }
@@ -329,12 +353,23 @@ bool Grill::esta_arriba()
 void Grill::resetear_rotor()
 {
     imprimir("Reseteando el rotor");
-    rotor->go(ROTOR_ON);
+    rotar_horario();
 
-    while (!limit_switch_pulsado(PIN_CS_LIMIT_ROTOR)) {}
+     // Mensajia ez imprimitzen eoteko denboa guztiyan, pausa bat hilua blokeatu gabe (MQTT ENTZUN AHAL IZATEKO)
+    unsigned long previousMessageMillis = 0;
+    const long messageInterval = 1000; // 1 segunduko pausa
+    
+    while (!limit_switch_pulsado(PIN_CS_LIMIT_ROTOR)) {
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMessageMillis >= messageInterval) {
+            previousMessageMillis = currentMillis;
+            imprimir("Reseteando rotor...");
+        }
+        client.loop();
+    }
 
-    rotor->stop();
-    resetear_encoder(rotorEncoder);
+    parar_rotor();
+    rotorEncoder->reset_counter(0);
 }
 
 void Grill::resetear_actuador_lineal()
@@ -362,7 +397,8 @@ void Grill::resetear_actuador_lineal()
 
 void Grill::resetear_encoder(DeviceEncoder* selected_encoder) {
     // Parametrotik pasatzezaio zein encoder nahideun reseteatu, hola ezdet beste metodo bat inber RotorEncoder reseteatzeko.
-    selected_encoder->reset_counter(0);
+    selected_encoder->reset_counter(PULSES_ENCODER_GRILL);
+    // selected_encoder->reset_counter(0);
 }
 
 bool Grill::limit_switch_pulsado(const int CS_LIMIT_SWITCH) {
@@ -396,7 +432,7 @@ void Grill::subscribe_topics() {
         return;
     }
 
-    const char* topics[] = {"log", "reiniciar", "dirigir", "establecer_posicion", "ejecutar_programa", "cancelar_programa", "inclinar", "dirigir_rotor", "establecer_modo"};
+    const char* topics[] = {"log", "reiniciar", "dirigir", "inclinar", "establecer_posicion", "ejecutar_programa", "cancelar_programa", "establecer_inclinacion", "establecer_modo"};
     const int numTopics = sizeof(topics) / sizeof(topics[0]);
 
     for (int i = 0; i < numTopics; ++i) {
@@ -423,8 +459,18 @@ void Grill::handleMQTTMessage(const char* pAccion, const char* pPayload) {
         } else if (payload == "parar") {
             parar();
         }
-    }
-    
+    }  
+
+     if (accion == "inclinar") {
+        if (payload == "horario") {
+            rotar_horario();
+        } else if (payload == "antihorario") {
+            rotar_antihorario();
+        } else if (payload == "parar") {
+            parar_rotor ();
+        }
+    }  
+
     if (accion == "establecer_posicion") {
         int posicion = payload.toInt();
         go_to(posicion);
@@ -435,6 +481,7 @@ void Grill::handleMQTTMessage(const char* pAccion, const char* pPayload) {
     }
     
     if (accion == "ejecutar_programa") {
+        imprimir("Ejecutando un programa..."); 
         executeProgram(pPayload);
     }
     
@@ -443,21 +490,10 @@ void Grill::handleMQTTMessage(const char* pAccion, const char* pPayload) {
         imprimir("Programa cancelado");
     }
     
-    if (accion == "inclinar")
+    if (accion == "establecer_inclinacion")
     {
         int grados = payload.toInt();
         go_to_rotor(grados);
-    }
-    
-    if (accion == "dirigir_rotor")
-    {
-        if (payload == "rotar") {
-            rotar();
-        }
-        
-        if (payload == "parar_rotor") {
-            parar_rotor();
-        } 
     }
     
     if (accion = "establecer_modo")
@@ -484,46 +520,65 @@ void Grill::handleMQTTMessage(const char* pAccion, const char* pPayload) {
     }
 }
 
-void Grill::executeProgram(const char* program) {
-    StaticJsonDocument<2000> doc;
+void Grill::executeProgram(const char* program) { 
+     
+    // Aurretik programa bat ejekutatzen baldin bazan kantzelatu.
+    cancelar_programa();  
+
+    StaticJsonDocument<5000> doc;
     DeserializationError error = deserializeJson(doc, program);
 
     if (error) {
-        imprimir("Error al serializar JSON");
+        imprimir("Error al serializar JSON.");
         return;
+    } else { 
+        imprimir("JSON correcto.");
     }
 
     // Imprimir el JSON recibido para depuración
-    Serial.println("JSON recibido:");
     serializeJson(doc, Serial);
     Serial.println();
 
     JsonArray array = doc.as<JsonArray>();
-    numPasosPrograma = array.size();
+    numPasosPrograma = array.size(); 
     
     for (int i = 0; i < numPasosPrograma; i++) {
         JsonObject paso = array[i];
         if (paso.containsKey("tiempo") && paso.containsKey("temperatura")) {
-            pasos[i] = {paso["tiempo"], paso["temperatura"], -1, nullptr};
+            pasos[i] = {paso["tiempo"], paso["temperatura"], -1, -1};
         } else if (paso.containsKey("tiempo") && paso.containsKey("posicion")) {
-            pasos[i] = {paso["tiempo"], -1, paso["posicion"], nullptr};
-        } else if (paso.containsKey("accion")) {
-            pasos[i] = {-1, -1, -1, paso["accion"]};
-        }
+            pasos[i] = {paso["tiempo"], -1, paso["posicion"], -1};
+        } else if (paso.containsKey("tiempo") && paso.containsKey("rotacion")) {
+            pasos[i] = {paso["tiempo"], -1, -1, paso["rotacion"]};
+        } 
     }
 
     // Inicializar variables de estado
     pasoActualPrograma = 0;
-    pasoEnProgreso = false;
+    objetivoAlcanzado = false;
     tiempoInicioPaso = millis();
     cancelarPrograma = false; // Reiniciar la bandera de cancelación al iniciar un nuevo programa
 }
 
+void Grill::cancelar_programa()
+{
+    parar();  
+    gradosObjetivo = SIN_OBJETIVO;
+    posicionObjetivo = SIN_OBJETIVO;
+    temperaturaObjetivo = SIN_OBJETIVO;
+    numPasosPrograma = 0;
+    pasoActualPrograma = 0;
+    cancelarPrograma = false; // Resetear la bandera de cancelación
+    objetivoAlcanzado = false; // Resetear la bandera de cancelación
+    tiempoInicioPaso = 0; // Resetear la bandera de cancelación
 
+    imprimir("Programa cancelado y sistema reseteado."); 
+}
 
 void Grill::update_programa() {
+     
     if (cancelarPrograma) {
-        parar();
+        cancelar_programa();
         return; // Salir si el programa ha sido cancelado
     }
 
@@ -532,32 +587,25 @@ void Grill::update_programa() {
     }
 
     Paso& paso = pasos[pasoActualPrograma];
+    
 
-    if (!pasoEnProgreso) {
-        if (paso.accion) {
-            Serial.print("Executing step - Accion: ");
-            Serial.println(paso.accion);
-
-            if (strcmp(paso.accion, "voltear") == 0) {
-                voltear();
-            }
-
-            pasoActualPrograma++;
-        } else {
-            if (paso.temperatura != -1) {
-                go_to_temp(paso.temperatura);
-                return; // Salir de la función para esperar a que se alcance la temperatura
-            } else if (paso.posicion != -1) {
-                go_to(paso.posicion);
-                return; // Salir de la función para esperar a que se alcance la posición
-            }
+    if (!objetivoAlcanzado) {
+        if (paso.temperatura != -1) {
+            go_to_temp(paso.temperatura);
+            return; // Salir de la función para esperar a que se alcance la temperatura
+        } else if (paso.posicion != -1) {
+            go_to(paso.posicion);
+            return; // Salir de la función para esperar a que se alcance la posición
+        } else if (paso.rotacion != -1) {
+            go_to_rotor(paso.rotacion);
+            return; // Salir de la función para esperar a que se alcance la rotacion
         }
     } else {
         unsigned long tiempoTranscurridoPaso = millis() - tiempoInicioPaso;
         int tiempo = paso.tiempo;
 
         if (tiempoTranscurridoPaso >= tiempo * 1000) {
-            pasoEnProgreso = false;
+            objetivoAlcanzado = false;
             pasoActualPrograma++;
         }
     }
