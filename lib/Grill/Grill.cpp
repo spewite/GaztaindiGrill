@@ -205,4 +205,8 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
             modeManager->mode = DUAL;
         }
     }
+
+    if (topic == GrillConstants::TOPIC_GET_PROGRAM_STATUS) {
+        programManager->publish_program_status();
+    }
 }

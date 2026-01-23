@@ -71,6 +71,12 @@ public:
 
     static constexpr const char* PAYLOAD_SINGLE = "normal";
     static constexpr const char* PAYLOAD_DUAL = "dual";
+
+    // Execution topics
+    static constexpr const char* TOPIC_GET_PROGRAM_STATUS = "get_program_status";
+    static constexpr const char* TOPIC_PROGRAM_STATUS_RESPONSE = "program_status_response";
+    static constexpr const char* TOPIC_PROGRAM_STEP_CHANGED = "program_step_changed";
+
 };
 
 #endif

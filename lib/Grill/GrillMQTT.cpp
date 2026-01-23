@@ -21,7 +21,8 @@ void GrillMQTT::subscribe_to_topics() {
         GrillConstants::TOPIC_EXECUTE_PROGRAM,
         GrillConstants::TOPIC_CANCEL_PROGRAM,
         GrillConstants::TOPIC_SET_TILT,
-        GrillConstants::TOPIC_SET_MODE
+        GrillConstants::TOPIC_SET_MODE,
+        GrillConstants::TOPIC_GET_PROGRAM_STATUS
     };
 
     const int numTopics = sizeof(topics) / sizeof(topics[0]);

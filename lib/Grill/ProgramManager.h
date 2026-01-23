@@ -14,7 +14,7 @@ public:
     void cancel_program();
     void update_program();
     void execute_program(const char* program);
-
+    void publish_program_status();
 private:
 
     int grillIndex;
@@ -54,7 +54,7 @@ private:
     };
     Step steps[GrillConstants::MAX_PROGRAM_STEPS];
     
-    
+    int programId;
     int programStepsCount;
     int programCurrentStep;
     unsigned long stepDurationStart;
