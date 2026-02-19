@@ -137,15 +137,16 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
     String topic(pAction);
     String payload(pPayload);
 
-    if (topic != "log") {
-        mqtt->print("An action has reached. " + topic + ": " + payload);
+    // We don't log the log topic itself to avoid loops
+    if (topic != GrillConstants::TOPIC_LOG) {
+        mqtt->print("Action received: " + topic + " -> " + payload);
 
-        if (statusLed && topic != GrillConstants::TOPIC_CANCEL_PROGRAM) {
+        if (statusLed && topic != GrillConstants::TOPIC_CMD_PROG_CANCEL) {
             statusLed->show_action_pulse();
         }
     }
 
-    if (topic == GrillConstants::TOPIC_MOVE) {
+    if (topic == GrillConstants::TOPIC_CMD_MOVE_VERTICAL) {
         if (payload == GrillConstants::PAYLOAD_UP) {
             movement->go_up();
         } else if (payload == GrillConstants::PAYLOAD_DOWN) {
@@ -155,7 +156,7 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
         }
     }  
 
-    if (topic == GrillConstants::TOPIC_TILT) {
+    if (topic == GrillConstants::TOPIC_CMD_MOVE_ROTATION) {
         if (payload == GrillConstants::PAYLOAD_CLOCKWISE) {
             movement->rotate_clockwise();
         } else if (payload == GrillConstants::PAYLOAD_COUNTER_CLOCKWISE) {
@@ -165,39 +166,39 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
         }
     }  
 
-    if (topic == GrillConstants::TOPIC_SET_POSITION) {
+    if (topic == GrillConstants::TOPIC_CMD_SET_POSITION) {
         int posicion = payload.toInt();
         movement->go_to(posicion);
     }
     
-    if (topic == GrillConstants::TOPIC_RESTART) {
-        mqtt->print("Reiniciando sistema (no está hecho aún)");
+    if (topic == GrillConstants::TOPIC_CMD_SYS_RESTART) {
+        mqtt->print("Restarting system...");
+        // NOTE: Add ESP.restart() here if needed
     }
     
-    if (topic == GrillConstants::TOPIC_EXECUTE_PROGRAM) {
-        mqtt->print("Ejecutando un programa..."); 
+    if (topic == GrillConstants::TOPIC_CMD_PROG_EXECUTE) {
+        mqtt->print("Executing a program..."); 
         programManager->execute_program(pPayload);
     }
     
-    if (topic == GrillConstants::TOPIC_CANCEL_PROGRAM) {
-        programManager->cancel_program();
-        mqtt->print("Programa cancelado");
+    if (topic == GrillConstants::TOPIC_CMD_PROG_CANCEL) {
+        programManager->finish_program(true);
+        mqtt->print("Program cancelled");
     }
     
-    if (topic == GrillConstants::TOPIC_SET_TILT)
+    if (topic == GrillConstants::TOPIC_CMD_SET_ROTATION)
     {
         int grades = payload.toInt();
         movement->go_to_rotor(grades);
     }
     
-    if (topic == GrillConstants::TOPIC_SET_MODE)
+    if (topic == GrillConstants::TOPIC_CMD_SYS_SET_MODE)
     {
         if (payload == GrillConstants::PAYLOAD_SINGLE)
         {
             modeManager->mode = SINGLE;
             movement->stop_lineal_actuator();
             movement->stop_rotor();
-            // movement->reset_rotor();
         }
         
         if (payload == GrillConstants::PAYLOAD_DUAL)
@@ -206,7 +207,8 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
         }
     }
 
-    if (topic == GrillConstants::TOPIC_GET_PROGRAM_STATUS) {
+    
+    if (topic == GrillConstants::TOPIC_CMD_REQ_PROG_STATUS) {
         programManager->publish_program_status();
     }
 }

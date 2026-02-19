@@ -12,28 +12,13 @@ void GrillMQTT::subscribe_to_topics() {
         return;
     }
 
-    const char* topics[] = {
-        GrillConstants::TOPIC_LOG,
-        GrillConstants::TOPIC_RESTART,
-        GrillConstants::TOPIC_MOVE,
-        GrillConstants::TOPIC_TILT,
-        GrillConstants::TOPIC_SET_POSITION,
-        GrillConstants::TOPIC_EXECUTE_PROGRAM,
-        GrillConstants::TOPIC_CANCEL_PROGRAM,
-        GrillConstants::TOPIC_SET_TILT,
-        GrillConstants::TOPIC_SET_MODE,
-        GrillConstants::TOPIC_GET_PROGRAM_STATUS
-    };
+    // We subscribe to all action topics for this grill using a wildcard
+    String action_topic = "grill/" + String(grillIndex) + "/action/#";
 
-    const int numTopics = sizeof(topics) / sizeof(topics[0]);
-
-    for (int i = 0; i < numTopics; ++i) {
-        String topic = parse_topic(topics[i]);
-        if (client.subscribe(topic.c_str())) {
-            Serial.println("Subscribed to: " + topic);
-        } else {
-            Serial.println("Failed to subscribe to: " + topic);
-        }
+    if (client.subscribe(action_topic.c_str())) {
+        Serial.println("Subscribed to: " + action_topic);
+    } else {
+        Serial.println("Failed to subscribe to: " + action_topic);
     }
 }
 
@@ -49,10 +34,10 @@ String GrillMQTT::parse_topic(String action) {
     return "grill/" + String(grillIndex) + "/" + action;
 }
 
-bool GrillMQTT::publish_message(const String& topic, const String& payload) {
+bool GrillMQTT::publish_message(const String& topic, const String& payload, bool retain) {
     if (!client.connected()) {
         extern void connect_to_mqtt();
         connect_to_mqtt();
     }
-    return client.publish(topic.c_str(), payload.c_str(), true);
+    return client.publish(topic.c_str(), payload.c_str(), retain);
 }

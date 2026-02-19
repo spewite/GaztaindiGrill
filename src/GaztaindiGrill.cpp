@@ -152,16 +152,36 @@ void handle_mqtt_callback(char* topic, byte* payload, unsigned int length) {
     memcpy(message, payload, length);
     message[length] = '\0';
 
-    // Get the action and its corresponding grill taking into account the topic format is "grill/{id}/{action}"
-    int id;
-    char action[120]; // An MQTT topic cant be longer than the size of the array.
-    sscanf(topic, "grill/%d/%s", &id, action);
+    String topicStr(topic);
 
+    // Find the first slash
+    int firstSlash = topicStr.indexOf('/');
+    if (firstSlash == -1) {
+        // Not a valid grill topic, maybe a global one. Ignoring for now.
+        return; 
+    }
+
+    // Find the second slash, starting after the first one
+    int secondSlash = topicStr.indexOf('/', firstSlash + 1);
+    if (secondSlash == -1) {
+        // This could be a top-level topic like "grill/0/status"
+        // Let's handle that if necessary, or ignore. For now, we only care about action topics.
+        return; 
+    }
+
+    // Extract the ID
+    String idStr = topicStr.substring(firstSlash + 1, secondSlash);
+    int id = idStr.toInt();
+
+    // Extract the rest of the topic as the action
+    String actionStr = topicStr.substring(secondSlash + 1);
+    
     // Verify that the id is valid before using it
     if (id >= 0 && id < GrillConstants::NUM_GRILLS) {
         Grill* grill = grillSystem->get_grill(id);
         if (grill) {
-            grill->handle_mqtt_message(action, message);
+            // Convert String to const char* for the function call
+            grill->handle_mqtt_message(actionStr.c_str(), message);
         }
     }
 }

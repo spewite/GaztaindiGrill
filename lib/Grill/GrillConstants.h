@@ -1,5 +1,5 @@
-#ifndef GRILL_CONSTANTS
-#define GRILL_CONSTANTS
+#ifndef GRILL_CONSTANTS_H
+#define GRILL_CONSTANTS_H
 
 class GrillConstants {
 public:
@@ -15,13 +15,13 @@ public:
     static constexpr float RNOMINAL = 100.0f;
     
     // Margins
-    static constexpr int POSITION_MARGIN = 2;        // For go_to position
-    static constexpr int TEMPERATURE_MARGIN = 2;     // For go_to temperature
-    static constexpr int ROTOR_MARGIN = 3;           // For go_to rotor
+    static constexpr int POSITION_MARGIN = 2;
+    static constexpr int TEMPERATURE_MARGIN = 2;
+    static constexpr int ROTOR_MARGIN = 3;
     
     // Timeouts
-    static constexpr unsigned long RESET_TIMEOUT = 1000;     //  1 seconds
-    static constexpr unsigned long MOVEMENT_TIMEOUT = 30000; // 30 segundos
+    static constexpr unsigned long RESET_TIMEOUT = 1000;
+    static constexpr unsigned long MOVEMENT_TIMEOUT = 30000;
     
     // Time intervals
     static constexpr unsigned long SENSOR_UPDATE_INTERVAL = 1500;
@@ -30,53 +30,51 @@ public:
     // System limits
     static constexpr int MAX_PROGRAM_STEPS = 50;
 
+    // --- MQTT TOPICS ---
+    
+    // -- Global Topics --
+    static constexpr const char* TOPIC_CONNECTION_STATUS = "status"; // grill/{id}/status
+    static constexpr const char* TOPIC_LOG = "log";                  // grill/{id}/log
+
+    // -- Command Topics (Client -> ESP32) --
+    // Base: grill/{id}/...
+    static constexpr const char* TOPIC_CMD_MOVE_VERTICAL = "action/movement/vertical";
+    static constexpr const char* TOPIC_CMD_MOVE_ROTATION = "action/movement/rotation";
+    static constexpr const char* TOPIC_CMD_SET_POSITION = "action/movement/set_position";
+    static constexpr const char* TOPIC_CMD_SET_ROTATION = "action/movement/set_rotation";
+    
+    static constexpr const char* TOPIC_CMD_PROG_EXECUTE = "action/program/execute";
+    static constexpr const char* TOPIC_CMD_PROG_CANCEL = "action/program/cancel";
+     static constexpr const char* TOPIC_CMD_REQ_PROG_STATUS = "action/request/program_status";   
+
+    static constexpr const char* TOPIC_CMD_SYS_SET_MODE = "action/system/set_mode";
+    static constexpr const char* TOPIC_CMD_SYS_RESTART = "action/system/restart";
+    
+    // -- State Topics (ESP32 -> Client) --
+    // Base: grill/{id}/...
+    static constexpr const char* TOPIC_STATE_SENSOR_POSITION = "status/sensor/position";
+    static constexpr const char* TOPIC_STATE_SENSOR_ROTATION = "status/sensor/rotation";
+    static constexpr const char* TOPIC_STATE_SENSOR_TEMP = "status/sensor/temperature";
+
+    static constexpr const char* TOPIC_STATE_PROG_CURRENT = "status/program/current";
+
+    // --- MQTT PAYLOADS ---
+    
     // JSON field names for program steps
     static constexpr const char* JSON_TIME = "time";
     static constexpr const char* JSON_TEMPERATURE = "temperature";
     static constexpr const char* JSON_POSITION = "position";
     static constexpr const char* JSON_ROTATION = "rotation";
     static constexpr const char* JSON_ACTION = "action";
-    
-    // Sensor update topics
-    static constexpr const char* TOPIC_UPDATE_POSITION = "update_position";
-    static constexpr const char* TOPIC_UPDATE_TEMPERATURE = "update_temperature";
-    static constexpr const char* TOPIC_UPDATE_TILT = "update_tilt";
-
-    // Movement topics
-    static constexpr const char* TOPIC_MOVE = "move";
-    static constexpr const char* TOPIC_TILT = "tilt";
-
-    // Set position topics
-    static constexpr const char* TOPIC_SET_POSITION = "set_position";
-    static constexpr const char* TOPIC_SET_TILT = "set_tilt";
-
-    // Program topics
-    static constexpr const char* TOPIC_EXECUTE_PROGRAM = "execute_program";
-    static constexpr const char* TOPIC_CANCEL_PROGRAM = "cancel_program";
-    
-    // Mode topic
-    static constexpr const char* TOPIC_SET_MODE = "set_mode";
-    
-    // Miscellaneous topics
-    static constexpr const char* TOPIC_LOG = "log";
-    static constexpr const char* TOPIC_RESTART = "restart";
 
     // Command payloads
     static constexpr const char* PAYLOAD_UP = "up";
     static constexpr const char* PAYLOAD_DOWN = "down";
     static constexpr const char* PAYLOAD_STOP = "stop";
-
     static constexpr const char* PAYLOAD_CLOCKWISE = "clockwise";
     static constexpr const char* PAYLOAD_COUNTER_CLOCKWISE = "counter_clockwise";
-
     static constexpr const char* PAYLOAD_SINGLE = "normal";
     static constexpr const char* PAYLOAD_DUAL = "dual";
-
-    // Execution topics
-    static constexpr const char* TOPIC_GET_PROGRAM_STATUS = "get_program_status";
-    static constexpr const char* TOPIC_PROGRAM_STATUS_RESPONSE = "program_status_response";
-    static constexpr const char* TOPIC_PROGRAM_STEP_CHANGED = "program_step_changed";
-
 };
 
 #endif

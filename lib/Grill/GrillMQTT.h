@@ -13,7 +13,7 @@ public:
     void subscribe_to_topics();
     void print(String msg);
     String parse_topic(String action);
-    bool publish_message(const String& topic, const String& payload);
+    bool publish_message(const String& topic, const String& payload, bool retain = false);
 
 private:
 
