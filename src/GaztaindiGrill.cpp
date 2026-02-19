@@ -5,6 +5,7 @@
 #include <PubSubClient.h>
 #include <ArduinoOTA.h>
 
+#include <GrillConstants.h>
 #include <GRILL_config.h>
 #include <GrillSystem.h>
 #include <StatusLED.h>
@@ -44,14 +45,20 @@ void setup() {
     setup_ota();
     client.setCallback(handle_mqtt_callback);
     connect_to_mqtt();
+
+    // Notify that the system is resetting
+    client.publish(GrillConstants::TOPIC_RESET_STATUS, GrillConstants::PAYLOAD_RESETTING, true);
   
-    // Initialize GrillSystem
+    // Initialize GrillSystem (blocking call)
     grillSystem = new GrillSystem();
     if (!grillSystem->initialize_system(&statusLed)) {
         Serial.println("Error initializing grill system");
         statusLed.setState(LedState::ERROR);
         return;
     }
+
+    // Notify that all grills are reset and the system is ready
+    client.publish(GrillConstants::TOPIC_RESET_STATUS, GrillConstants::PAYLOAD_RESET_READY, true);
   
 }
 void loop() {
@@ -120,10 +127,11 @@ void connect_to_mqtt() {
             Serial.print("Attempting MQTT connection...");
             
             // LWT configuration
-            const char* willTopic   = "grill/status";
-            const char* willMessage = "offline";
-            int willQoS             = 1;
-            bool willRetain         = true;
+            const char* willTopic     = GrillConstants::TOPIC_LWT;
+            const char* onlineMessage = GrillConstants::PAYLOAD_LWT_ONLINE;
+            const char* willMessage   = GrillConstants::PAYLOAD_LWT_OFFLINE;
+            int willQoS               = 1;
+            bool willRetain           = true;
 
             if (client.connect(
                 "ESP32Client", 
@@ -132,7 +140,7 @@ void connect_to_mqtt() {
             )) {
                 
                 Serial.println("connected to mqtt");
-                client.publish("grill/status", "online", true);
+                client.publish(willTopic, onlineMessage, true);
                 
             } else {
                 Serial.print("failed, rc=");

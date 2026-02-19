@@ -33,9 +33,9 @@ public:
     // --- MQTT TOPICS ---
     
     // -- Global Topics --
-    static constexpr const char* TOPIC_CONNECTION_STATUS = "status"; // grill/{id}/status
-    static constexpr const char* TOPIC_LOG = "log";                  // grill/{id}/log
-
+    static constexpr const char* TOPIC_LWT = "grill/connection";
+    static constexpr const char* TOPIC_RESET_STATUS = "grill/reset_status";
+    
     // -- Command Topics (Client -> ESP32) --
     // Base: grill/{id}/...
     static constexpr const char* TOPIC_CMD_MOVE_VERTICAL = "action/movement/vertical";
@@ -45,13 +45,14 @@ public:
     
     static constexpr const char* TOPIC_CMD_PROG_EXECUTE = "action/program/execute";
     static constexpr const char* TOPIC_CMD_PROG_CANCEL = "action/program/cancel";
-     static constexpr const char* TOPIC_CMD_REQ_PROG_STATUS = "action/request/program_status";   
-
+    static constexpr const char* TOPIC_CMD_REQ_PROG_STATUS = "action/request/program_status";   
+    
     static constexpr const char* TOPIC_CMD_SYS_SET_MODE = "action/system/set_mode";
     static constexpr const char* TOPIC_CMD_SYS_RESTART = "action/system/restart";
     
     // -- State Topics (ESP32 -> Client) --
     // Base: grill/{id}/...
+    static constexpr const char* TOPIC_LOG = "log";
     static constexpr const char* TOPIC_STATE_SENSOR_POSITION = "status/sensor/position";
     static constexpr const char* TOPIC_STATE_SENSOR_ROTATION = "status/sensor/rotation";
     static constexpr const char* TOPIC_STATE_SENSOR_TEMP = "status/sensor/temperature";
@@ -66,6 +67,15 @@ public:
     static constexpr const char* JSON_POSITION = "position";
     static constexpr const char* JSON_ROTATION = "rotation";
     static constexpr const char* JSON_ACTION = "action";
+
+
+    // General payloads
+    static constexpr const char* PAYLOAD_LWT_ONLINE  = "online";
+    static constexpr const char* PAYLOAD_LWT_OFFLINE = "offline";
+
+    static constexpr const char* PAYLOAD_RESETTING = "resetting";
+    static constexpr const char* PAYLOAD_RESET_READY = "ready";
+
 
     // Command payloads
     static constexpr const char* PAYLOAD_UP = "up";
