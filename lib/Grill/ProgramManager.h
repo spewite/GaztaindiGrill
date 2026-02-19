@@ -11,10 +11,11 @@ public:
     ProgramManager(int index, GrillMQTT* mqtt, MovementManager* movement, StatusLED* statusLed);
 
     // ----------------- PROGRAMS ----------------- //
-    void cancel_program();
     void update_program();
     void execute_program(const char* program);
     void publish_program_status();
+    void finish_program(bool forcedCancelation);
+
 private:
 
     int grillIndex;
@@ -23,12 +24,13 @@ private:
     MovementManager* movement;
     StatusLED* statusLed;
 
+    // Por ahora solo se use el IDLE. Se deberia quitar esto? 
+    // Quizas en un futuro se quiere mostar al usuario el estado del programa? 
     enum ProgramState {
         PROGRAM_IDLE,
         PROGRAM_RUNNING,
         PROGRAM_COMPLETED,
-        PROGRAM_CANCELLED,
-        PROGRAM_ERROR
+        PROGRAM_CANCELLED
     } programState = PROGRAM_IDLE;
     
     enum StepState {
@@ -54,10 +56,15 @@ private:
     };
     Step steps[GrillConstants::MAX_PROGRAM_STEPS];
     
+    JsonDocument currentProgramJson;
     int programId;
     int programStepsCount;
     int programCurrentStep;
     unsigned long stepDurationStart;
+    String description;
+    String programName;
+    String creatorName;
+    int usageCount;
 };
 
 #endif
