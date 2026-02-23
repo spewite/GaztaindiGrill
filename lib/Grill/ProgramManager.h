@@ -4,7 +4,26 @@
 #include <ArduinoJson.h>
 #include <GrillMQTT.h>
 #include <MovementManager.h>
+#include <Utils.h>
 #include <StatusLED.h>
+
+struct Step {
+    int time;
+    int temperature;
+    int position;
+    int rotation;
+    String action;
+};
+
+struct Program {
+    int id = -1;
+    String name;
+    String description;
+    String creatorName;
+    int usageCount = 0;
+    int stepsCount = 0;
+    Step steps[GrillConstants::MAX_PROGRAM_STEPS];
+};
 
 class ProgramManager {
 public:
@@ -47,24 +66,11 @@ private:
     void execute_current_action();
     void advance_to_next_step();
     
-    struct Step {
-        int time;
-        int temperature;
-        int position;
-        int rotation;
-        const char* action;
-    };
-    Step steps[GrillConstants::MAX_PROGRAM_STEPS];
-    
-    JsonDocument currentProgramJson;
-    int programId;
-    int programStepsCount;
+    Program currentProgram;
+
     int programCurrentStep;
     unsigned long stepDurationStart;
-    String description;
-    String programName;
-    String creatorName;
-    int usageCount;
+    uint32_t stepStartUnix; // Timestamp of when a step started (this is to indicate in the client how many seconds has being executing)
 };
 
 #endif

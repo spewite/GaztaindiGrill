@@ -5,24 +5,20 @@ ProgramManager::ProgramManager(int index, GrillMQTT* mqtt, MovementManager* move
     mqtt(mqtt),
     movement(movement),
     statusLed(statusLed),
-    programStepsCount(0),
     programCurrentStep(0),
     stepDurationStart(0),
-    programId(-1),
-    description(""),
-    programName(""),
-    creatorName(""),
-    usageCount(-1)
+    stepStartUnix(0)
      {}
 
     
-void ProgramManager::execute_program(const char* program) { 
+void ProgramManager::execute_program(const char* jsonPayload) { 
      
     // Cancelar cualquier programa anterior.
     finish_program(true);
 
     // Usamos JsonDocument para que v7 gestione la memoria
-    DeserializationError error = deserializeJson(currentProgramJson, program);
+    JsonDocument doc;
+    DeserializationError error = deserializeJson(doc, jsonPayload);
 
     if (error) {
         mqtt->print("Error deserializing the program JSON.");
@@ -30,37 +26,36 @@ void ProgramManager::execute_program(const char* program) {
     }
     
     // Extract the program Id. We will use -1 if doesnt exist.
-    programId = currentProgramJson["programId"] | -1;
-    mqtt->print("Executing program with ID: " + String(programId));
+    currentProgram.id = doc["programId"] | -1;
+    currentProgram.description = doc["description"] | "";
+    currentProgram.name = doc["name"] | "";
+    currentProgram.creatorName = doc["creatorName"] | "";
+    currentProgram.usageCount = doc["usageCount"] | -1;
+    mqtt->print("Executing program with ID: " + String(currentProgram.id));
 
     // Extract the steps array from the JSON object
-    JsonArray stepsArray = currentProgramJson["steps"].as<JsonArray>();
+    JsonArray stepsArray = doc["steps"].as<JsonArray>();
     if (stepsArray.isNull()) {
         mqtt->print("Error: JSON does not contain a 'steps' array.");
         return;
     }
-    
-    programStepsCount = stepsArray.size(); 
-    
-    for (int i = 0; i < programStepsCount; i++) {
-        JsonObject step = stepsArray[i];
-        
-        Step newStep = {
-            .time = step[GrillConstants::JSON_TIME] | 0,
-            .temperature = step[GrillConstants::JSON_TEMPERATURE] | -1,
-            .position = step[GrillConstants::JSON_POSITION] | -1,
-            .rotation = step[GrillConstants::JSON_ROTATION] | -1,
-            .action = step[GrillConstants::JSON_ACTION] | nullptr
-        };
-        
-        steps[i] = newStep;
-    }
 
-    // Set the metadata of the program
-    description = currentProgramJson["description"] | "";
-    programName = currentProgramJson["name"] | "";
-    creatorName = currentProgramJson["creatorName"] | "";
-    usageCount  = currentProgramJson["usageCount"] | -1;
+    // Reset value for steps count (in the loop we will set the good value)
+    currentProgram.stepsCount = 0;
+    
+    for (JsonObject v : stepsArray) {
+       
+        if (currentProgram.stepsCount >= GrillConstants::MAX_PROGRAM_STEPS) break; // Array protection
+
+        Step& s = currentProgram.steps[currentProgram.stepsCount];
+        s.time = v[GrillConstants::JSON_TIME] | 0;
+        s.temperature = v[GrillConstants::JSON_TEMPERATURE] | -1;
+        s.position = v[GrillConstants::JSON_POSITION] | -1;
+        s.rotation = v[GrillConstants::JSON_ROTATION] | -1;
+        s.action = v[GrillConstants::JSON_ACTION] | "";
+        
+        currentProgram.stepsCount++;
+    }
 
     // Init state variables
     programCurrentStep = 0;
@@ -92,18 +87,12 @@ void ProgramManager::finish_program(bool forcedCancelation = false) {
     movement->stop_lineal_actuator();
     
     // Clear the in-memory program
-    currentProgramJson.clear();
-    programId = -1;
-    programStepsCount = 0;
     programCurrentStep = 0;
     stepDurationStart = 0;
     
     // Reset state machine
     programState = PROGRAM_IDLE;
     stepState = STEP_COMPLETED;
-
-    // Clear the in-memory program
-    currentProgramJson.clear();
 
     // Public final status
     publish_program_status();
@@ -121,12 +110,12 @@ void ProgramManager::update_program() {
     statusLed->setState(LedState::PROGRAM_RUNNING);
     
     // Verify if all the steps have been completed
-    if (programCurrentStep >= programStepsCount) {
+    if (programCurrentStep >= currentProgram.stepsCount) {
         finish_program();
         return;
     }
     
-    Step& currentStep = steps[programCurrentStep];
+    Step& currentStep = currentProgram.steps[programCurrentStep];
     
     // Máquina de estados para el paso actual
     switch (stepState) {
@@ -154,12 +143,14 @@ void ProgramManager::update_program() {
 
 void ProgramManager::start_current_step() {
     
-    Step& step = steps[programCurrentStep];
+    Step& step = currentProgram.steps[programCurrentStep];
     
-    mqtt->print("Starting step " + String(programCurrentStep + 1) + "/" + String(programStepsCount));
+    stepStartUnix = Utils::get_current_unix_time();
+
+    mqtt->print("Starting step " + String(programCurrentStep + 1) + "/" + String(currentProgram.stepsCount));
     
     // Verificar qué tipo de paso es
-    if (step.action != nullptr) {
+    if (step.action != "") {
         // Es una acción
         stepState = STEP_EXECUTING_ACTION;
     } else if (step.temperature != -1) {
@@ -174,6 +165,10 @@ void ProgramManager::start_current_step() {
         // Movimiento por rotación
         movement->go_to_rotor(step.rotation);
         stepState = STEP_MOVING_TO_TARGET;
+    } else {
+        // Si es un paso de "Solo Tiempo" (sin movimientos ni acciones)
+        // Pasamos directamente a esperar el tiempo.
+        stepState = STEP_WAITING_TIME;
     }
 }
 
@@ -187,7 +182,7 @@ void ProgramManager::check_target_reached() {
 }
 
 void ProgramManager::check_time_elapsed() {
-    Step& step = steps[programCurrentStep];
+    Step& step = currentProgram.steps[programCurrentStep];
     unsigned long stepElapsedTime = millis() - stepDurationStart;
     
     if (stepElapsedTime >= step.time * 1000) {
@@ -197,9 +192,9 @@ void ProgramManager::check_time_elapsed() {
 }
 
 void ProgramManager::execute_current_action() {
-    Step& step = steps[programCurrentStep];
+    Step& step = currentProgram.steps[programCurrentStep];
     
-    if (strcmp(step.action, "flip") == 0) {
+    if (step.action == "flip") {
         mqtt->print("Executing flip action");
         movement->turn_around();
         stepState = STEP_MOVING_TO_TARGET;
@@ -221,37 +216,40 @@ void ProgramManager::advance_to_next_step() {
 
 
 void ProgramManager::publish_program_status() {
-    
+
     JsonDocument doc; 
     
     bool isActive = (programState == PROGRAM_RUNNING);
     doc["isRunning"] = isActive;
 
     if (isActive) {
-        doc["name"] = programName;
-        doc["programId"] = programId;
+        doc["name"] = currentProgram.name;
+        doc["programId"] = currentProgram.id;
         doc["currentStepIndex"] = programCurrentStep;
-        doc["description"] = description;
-        doc["creatorName"] = creatorName;
-        doc["usageCount"] = usageCount;
 
-        // Add the elapsed time of the current step, if applicable
-        if (stepState == STEP_WAITING_TIME) {
-            unsigned long elapsedTimeMs = millis() - stepDurationStart;
-            doc["elapsedTime"] = elapsedTimeMs / 1000;
-        } else {
-            doc["elapsedTime"] = 0;
+        // We manually build the steps array to inject runtime data
+        JsonArray stepsArr = doc["steps"].to<JsonArray>();
+        
+        for (int i = 0; i < currentProgram.stepsCount; i++) {
+            JsonObject sObj = stepsArr.add<JsonObject>();
+            Step& s = currentProgram.steps[i];
+            
+            if (s.time != 0) sObj["time"] = s.time;
+            if (s.temperature != -1) sObj["temperature"] = s.temperature;
+            if (s.position != -1) sObj["position"] = s.position;
+            if (s.rotation != -1) sObj["rotation"] = s.rotation;
+            if (s.action != "") sObj["action"] = s.action;
+
+            // If the step is the current one add step start timestamp
+            if (i == programCurrentStep) {
+                sObj["stepStartUnix"] = stepStartUnix;
+            }
         }
-
-        // Add the program
-        doc["steps"] = currentProgramJson["steps"];
     }
 
     String jsonOutput;
     serializeJson(doc, jsonOutput);
-
+    
     String responseTopic = mqtt->parse_topic(GrillConstants::TOPIC_STATE_PROG_CURRENT);
     mqtt->publish_message(responseTopic, jsonOutput.c_str(), true);
-
-    mqtt->print("Published program status.");
 }
