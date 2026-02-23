@@ -4,6 +4,9 @@
 class GrillConstants {
 public:
 
+    // Maximum ammount of steps permitted in a program
+    static constexpr int MAX_PROGRAM_STEPS = 50;
+
     static constexpr int NUM_GRILLS = 2;
 
     // Special values
@@ -27,9 +30,6 @@ public:
     static constexpr unsigned long SENSOR_UPDATE_INTERVAL = 1500;
     static constexpr unsigned long PROGRAM_UPDATE_INTERVAL = 100;
     
-    // System limits
-    static constexpr int MAX_PROGRAM_STEPS = 50;
-
     // --- MQTT TOPICS ---
     
     // -- Global Topics --

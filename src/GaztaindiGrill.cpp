@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoOTA.h>
+#include <time.h>
 
 #include <GrillConstants.h>
 #include <GRILL_config.h>
@@ -15,6 +16,7 @@ const char* password = "Gaztaindi";
 const IPAddress local_IP(192, 168, 1, 100);
 const IPAddress gateway(192, 168, 1, 1);
 const IPAddress subnet(255, 255, 255, 0);  
+const IPAddress dns(8, 8, 8, 8);
 
 const char* mqttServer = "192.168.1.76"; 
 const int mqttPort = 1883;  
@@ -31,6 +33,7 @@ void connect_to_wifi();
 void connect_to_mqtt();
 void setup_ota();
 void handle_mqtt_callback(char* topic, byte* payload, unsigned int length);
+void setup_time();
 
 void setup() {
 
@@ -45,6 +48,9 @@ void setup() {
     setup_ota();
     client.setCallback(handle_mqtt_callback);
     connect_to_mqtt();
+
+    // Setup time
+    setup_time();
 
     // Notify that the system is resetting
     client.publish(GrillConstants::TOPIC_RESET_STATUS, GrillConstants::PAYLOAD_RESETTING, true);
@@ -100,7 +106,7 @@ void loop() {
 void connect_to_wifi() {
     Serial.print("Connecting to Wifi...");
     statusLed.setState(LedState::CONNECTING_WIFI);
-    WiFi.config(local_IP, gateway, subnet);
+    WiFi.config(local_IP, gateway, subnet, dns);
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
@@ -231,4 +237,15 @@ void setup_ota() {
 
     ArduinoOTA.begin();
     Serial.println("OTA ready.");
+}
+
+void setup_time() {
+    // Configura los servidores NTP y la zona horaria.
+    // "pool.ntp.org" es el servidor estándar. 
+    // Los ceros finales son para el offset de hora de verano si no usas una cadena de zona horaria.
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    
+    // Configurar zona horaria de España (CET/CEST)
+    setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
+    tzset();
 }
