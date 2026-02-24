@@ -14,8 +14,11 @@ public:
 
     // ---------------- MOVEMENTS ----------------- //
     void go_up();
+    void go_up_raw();
     void go_down();
+    void go_down_raw();
     void stop_lineal_actuator();
+    void stop_lineal_actuator_raw();
 
     void turn_around();   
     void rotate_clockwise();

@@ -3,9 +3,9 @@
 
 #include <GRILL_config.h>
 #include <Grill.h>
+#include <GrillMQTT.h>
 #include <DualModeCoordinator.h>
 #include <ModeManager.h> 
-#include <StatusLed.h> 
 
 class GrillSystem {
 public:
@@ -27,9 +27,13 @@ public:
     // Dual mode management
     bool is_dual_mode_active();
     void handle_dual_mode();
+
+    // MQTT Handling
+    void handle_mqtt_message(const char* topic, const char* payload);
     
 private:
     Grill* grills[GrillConstants::NUM_GRILLS];
+    GrillMQTT* mqtt;
     DualModeCoordinator* dualCoordinator;
     ModeManager* modeManager;
     

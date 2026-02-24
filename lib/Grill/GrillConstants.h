@@ -35,6 +35,8 @@ public:
     // -- Global Topics --
     static constexpr const char* TOPIC_LWT = "grill/connection";
     static constexpr const char* TOPIC_RESET_STATUS = "grill/reset_status";
+    static constexpr const char* TOPIC_CMD_SYS_SET_MODE = "grill/current_mode";
+    static constexpr const char* TOPIC_CMD_SYS_RESTART = "grill/restart";
     
     // -- Command Topics (Client -> ESP32) --
     // Base: grill/{id}/...
@@ -46,9 +48,6 @@ public:
     static constexpr const char* TOPIC_CMD_PROG_EXECUTE = "action/program/execute";
     static constexpr const char* TOPIC_CMD_PROG_CANCEL = "action/program/cancel";
     static constexpr const char* TOPIC_CMD_REQ_PROG_STATUS = "action/request/program_status";   
-    
-    static constexpr const char* TOPIC_CMD_SYS_SET_MODE = "action/system/set_mode";
-    static constexpr const char* TOPIC_CMD_SYS_RESTART = "action/system/restart";
     
     // -- State Topics (ESP32 -> Client) --
     // Base: grill/{id}/...
@@ -83,7 +82,7 @@ public:
     static constexpr const char* PAYLOAD_STOP = "stop";
     static constexpr const char* PAYLOAD_CLOCKWISE = "clockwise";
     static constexpr const char* PAYLOAD_COUNTER_CLOCKWISE = "counter_clockwise";
-    static constexpr const char* PAYLOAD_SINGLE = "normal";
+    static constexpr const char* PAYLOAD_SINGLE = "single";
     static constexpr const char* PAYLOAD_DUAL = "dual";
 };
 

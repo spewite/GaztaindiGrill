@@ -24,8 +24,12 @@ void MovementManager::go_up() {
         modeManager->dual_direction = UPWARDS;
     } else 
     {
-        hardware->drive->setSpeed(-255);
+        go_up_raw();
     }
+}
+
+void MovementManager::go_up_raw() {
+    hardware->drive->setSpeed(-255);
 }
 
 void MovementManager::go_down() {
@@ -34,8 +38,12 @@ void MovementManager::go_down() {
         modeManager->dual_direction = DOWNWARDS;
     } else 
     {
-        hardware->drive->setSpeed(255);
+        go_down_raw();
     }
+}
+
+void MovementManager::go_down_raw() {
+    hardware->drive->setSpeed(255);
 }
 
 void MovementManager::stop_lineal_actuator() {
@@ -44,8 +52,12 @@ void MovementManager::stop_lineal_actuator() {
         modeManager->dual_direction = STILL;
     } else 
     {
-        hardware->drive->setSpeed(0);
+        stop_lineal_actuator_raw();
     }
+}
+
+void MovementManager::stop_lineal_actuator_raw() {
+    hardware->drive->setSpeed(0);
 }
 
 /// ----------- ROTOR ----------- ///

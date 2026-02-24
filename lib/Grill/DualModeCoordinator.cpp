@@ -6,7 +6,6 @@ DualModeCoordinator::DualModeCoordinator(Grill* grill0, Grill* grill1)
 }
 
 bool DualModeCoordinator::are_both_at_top() {
-    // Here we use the real physical sensor, not the 'is_at_top_dual' variable
     return grill0->is_at_top() && grill1->is_at_top();
 }
 
@@ -18,8 +17,8 @@ bool DualModeCoordinator::is_dual_mode_active() {
 void DualModeCoordinator::start_reset_sequence() {
     if (resetState == IDLE) {
         resetState = RESETTING;
-        grill0->go_up();
-        grill1->go_up();
+        grill0->go_up_raw();
+        grill1->go_up_raw();
     }
 }
 
@@ -41,14 +40,16 @@ void DualModeCoordinator::update() {
             break;
 
         case RESETTING:
+
             // While resetting, check if both have reached the top.
             if (are_both_at_top()) {
-                grill0->stop_lineal_actuator();
-                grill1->stop_lineal_actuator();
+                grill0->stop_lineal_actuator_raw();
+                grill1->stop_lineal_actuator_raw();
+
+                grill0->reset_encoder();
+                grill1->reset_encoder();
                 
                 // Notify the sensors that this position is the "zero" for dual mode
-                grill0->set_is_at_top_dual(true);
-                grill1->set_is_at_top_dual(true);
                 
                 resetState = READY;
             }
@@ -66,16 +67,16 @@ void DualModeCoordinator::execute_synchronized_movement(DualModeDirection direct
     // This functions is only executed when resetState is READY
     switch (direction) {
         case UPWARDS:
-            grill0->go_up();
-            grill1->go_up();
+            grill0->go_up_raw();
+            grill1->go_up_raw();
             break;
         case STILL:
-            grill0->stop_lineal_actuator();
-            grill1->stop_lineal_actuator();
+            grill0->stop_lineal_actuator_raw();
+            grill1->stop_lineal_actuator_raw();
             break;
         case DOWNWARDS:
-            grill0->go_down();
-            grill1->go_down();
+            grill0->go_down_raw();
+            grill1->go_down_raw();
             break;
     }
 }

@@ -19,6 +19,16 @@ public:
 
     DualModeDirection dual_direction = STILL;
     Mode mode = SINGLE;
+    Mode requestedMode = SINGLE;
+
+    void requestMode(Mode newMode) {
+        requestedMode = newMode;
+    }
+
+    void confirmMode() {
+        mode = requestedMode;
+        dual_direction = STILL;
+    }
     
 private:
 

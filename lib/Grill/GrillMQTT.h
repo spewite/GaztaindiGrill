@@ -11,6 +11,7 @@ public:
     GrillMQTT(int index);
 
     void subscribe_to_topics();
+    void subscribe_to_system_topics();
     void print(String msg);
     String parse_topic(String action);
     bool publish_message(const String& topic, const String& payload, bool retain = false);

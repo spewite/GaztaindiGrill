@@ -35,23 +35,28 @@ void Grill::reset_system() {
     movement->reset_system();
 }
 
+void Grill::reset_encoder() {
+    hardware->reset_encoder(hardware->encoder);
+    sensor->update_encoder();
+}
+
 //
 // Movements
 //
-void Grill::go_up() {
-    movement->go_up();
+void Grill::go_up_raw() {
+    movement->go_up_raw();
 }
 
-void Grill::go_down() {
-    movement->go_down();
+void Grill::go_down_raw() {
+    movement->go_down_raw();
+}
+
+void Grill::stop_lineal_actuator_raw() {
+    movement->stop_lineal_actuator_raw();
 }
 
 void Grill::go_to(int position) {
     movement->go_to(position);
-}
-
-void Grill::stop_lineal_actuator() {
-    movement->stop_lineal_actuator();
 }
 
 //
@@ -67,14 +72,6 @@ long Grill::get_encoder() {
 
 bool Grill::is_at_top() {
     return sensor->is_at_top();
-}
-
-bool Grill::is_at_top_dual() {
-    return sensor->is_at_top_dual;
-}
-
-void Grill::set_is_at_top_dual(bool isAtTop) {
-    sensor->is_at_top_dual = isAtTop;
 }
 
 //
@@ -123,6 +120,10 @@ void Grill::execute_program(const char* program) {
 
 void Grill::update_program() {
     programManager->update_program();
+}
+
+bool Grill::is_program_running() { 
+    return programManager->is_program_running(); 
 }
 
 //
@@ -191,23 +192,7 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
         int grades = payload.toInt();
         movement->go_to_rotor(grades);
     }
-    
-    if (topic == GrillConstants::TOPIC_CMD_SYS_SET_MODE)
-    {
-        if (payload == GrillConstants::PAYLOAD_SINGLE)
-        {
-            modeManager->mode = SINGLE;
-            movement->stop_lineal_actuator();
-            movement->stop_rotor();
-        }
         
-        if (payload == GrillConstants::PAYLOAD_DUAL)
-        {
-            modeManager->mode = DUAL;
-        }
-    }
-
-    
     if (topic == GrillConstants::TOPIC_CMD_REQ_PROG_STATUS) {
         programManager->publish_program_status();
     }

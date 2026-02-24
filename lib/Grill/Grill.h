@@ -27,19 +27,18 @@ public:
     // Setup
     bool setup_devices();
     void reset_system();
+    void reset_encoder();
     
     // Movement
-    void go_up();
-    void go_down();
+    void go_up_raw();
+    void go_down_raw();
+    void stop_lineal_actuator_raw();
     void go_to(int position);
-    void stop_lineal_actuator();
     
     // Sensors
     int get_temperature();
     long get_encoder();
     bool is_at_top();
-    bool is_at_top_dual();
-    void set_is_at_top_dual(bool isAtTop);
 
     // Sensor updates
     void update_rotor_encoder();
@@ -57,10 +56,12 @@ public:
     // Programs
     void execute_program(const char* program);
     void update_program();
+    bool is_program_running();
     
     // MQTT
     void subscribe_to_topics();
     void handle_mqtt_message(const char* pAction, const char* pPayload);
+
 
 
 private:

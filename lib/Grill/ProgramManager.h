@@ -34,6 +34,7 @@ public:
     void execute_program(const char* program);
     void publish_program_status();
     void finish_program(bool forcedCancelation);
+    bool is_program_running();
 
 private:
 

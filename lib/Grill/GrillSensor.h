@@ -18,7 +18,6 @@ public:
     bool limit_switch_pressed(const int cs_limit_switch);
     bool is_valid_temperature(int temperature);
     bool is_at_top();
-    bool is_at_top_dual;
 
     // ---------- HOME ASSISTANT UPDATE ---------- //
     void update_rotor_encoder();

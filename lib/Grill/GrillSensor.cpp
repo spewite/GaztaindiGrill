@@ -3,7 +3,7 @@
 
 GrillSensor::GrillSensor(int index, GrillMQTT* mqtt, HardwareManager* hardware, ModeManager* modeManager):
     grillIndex(index), mqtt(mqtt), hardware(hardware), modeManager(modeManager),
-    is_at_top_dual(false), lastEncoderValue(0), lastRotorEncoderValue(0), lastTemperatureValue(0) {}
+    lastEncoderValue(0), lastRotorEncoderValue(0), lastTemperatureValue(0) {}
 
 
 // ------------- ENCODER ------------- //
@@ -31,7 +31,7 @@ void GrillSensor::update_encoder() {
 
 bool GrillSensor::is_at_top()
 {   
-    return (modeManager->mode == DUAL) ? is_at_top_dual : limit_switch_pressed(PIN_CS_LIMIT_LINEAL[grillIndex]);
+    return limit_switch_pressed(PIN_CS_LIMIT_LINEAL[grillIndex]);
 }
 
 bool GrillSensor::limit_switch_pressed(const int CS_LIMIT_SWITCH) {

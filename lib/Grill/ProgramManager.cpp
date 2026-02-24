@@ -214,15 +214,18 @@ void ProgramManager::advance_to_next_step() {
     publish_program_status(); 
 }
 
+bool ProgramManager::is_program_running() { 
+    return programState == PROGRAM_RUNNING;
+}
 
 void ProgramManager::publish_program_status() {
 
     JsonDocument doc; 
     
-    bool isActive = (programState == PROGRAM_RUNNING);
-    doc["isRunning"] = isActive;
+    bool isRunning = is_program_running();
+    doc["isRunning"] = isRunning;
 
-    if (isActive) {
+    if (isRunning) {
         doc["name"] = currentProgram.name;
         doc["programId"] = currentProgram.id;
         doc["currentStepIndex"] = programCurrentStep;

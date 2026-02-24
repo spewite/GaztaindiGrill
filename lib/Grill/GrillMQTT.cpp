@@ -22,15 +22,37 @@ void GrillMQTT::subscribe_to_topics() {
     }
 }
 
+void GrillMQTT::subscribe_to_system_topics() {
+    
+    if (!client.connected()) {
+        Serial.println("MQTT client is not connected. Cannot subscribe to topics.");
+        return;
+    }
+
+    // Subscribing to global system topics
+    client.subscribe(GrillConstants::TOPIC_CMD_SYS_SET_MODE);
+    client.subscribe(GrillConstants::TOPIC_CMD_SYS_RESTART);
+    client.subscribe(GrillConstants::TOPIC_RESET_STATUS);
+    
+    Serial.println("Subscribed to System MQTT Topics");
+}
+
 void GrillMQTT::print(String msg) {
-    Serial.print("[");
-    Serial.print(this->grillIndex);
-    Serial.print("] ");
+    if (this->grillIndex == -1) {
+        Serial.print("[SYSTEM] ");
+    } else {
+        Serial.print("[");
+        Serial.print(this->grillIndex);
+        Serial.print("] ");
+    }
     Serial.println(msg);
     publish_message(parse_topic("log"), msg);
 }
 
 String GrillMQTT::parse_topic(String action) {
+    if (this->grillIndex == -1) {
+        return "grill/" + action;
+    }
     return "grill/" + String(grillIndex) + "/" + action;
 }
 

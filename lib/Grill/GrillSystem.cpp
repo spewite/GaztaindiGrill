@@ -1,13 +1,14 @@
 #include <GrillSystem.h>
 #include <Arduino.h>
 
-GrillSystem::GrillSystem() : dualCoordinator(nullptr), modeManager(nullptr), previousMillisTemp(0) {
+GrillSystem::GrillSystem() : mqtt(nullptr), dualCoordinator(nullptr), modeManager(nullptr), previousMillisTemp(0) {
     for (int i = 0; i < GrillConstants::NUM_GRILLS; ++i) {
         grills[i] = nullptr;
     }
 }
 
 GrillSystem::~GrillSystem() {
+    delete mqtt;
     delete dualCoordinator;
     delete modeManager;
     for (int i = 0; i < GrillConstants::NUM_GRILLS; ++i) {
@@ -19,6 +20,10 @@ bool GrillSystem::initialize_system(StatusLED* statusLed) {
 
     // Create the mode manager instance
     modeManager = new ModeManager();
+
+    // Create system-level MQTT instance
+    mqtt = new GrillMQTT(-1);
+    mqtt->subscribe_to_system_topics();
 
     // Grill instantiation & start
     for (int i = 0; i < GrillConstants::NUM_GRILLS; ++i) {
@@ -42,6 +47,10 @@ bool GrillSystem::initialize_system(StatusLED* statusLed) {
 }
 
 void GrillSystem::update() {
+
+    if (modeManager->requestedMode != modeManager->mode) {
+        set_system_mode(modeManager->requestedMode);
+    }
     
     // Handle dual mode
     handle_dual_mode();
@@ -114,3 +123,60 @@ void GrillSystem::handle_temperature_updates() {
     //     }
     // }
 }
+
+void GrillSystem::set_system_mode(Mode newMode) {
+    
+    // If a program is being executed, do not allow mode change
+    for (int i = 0; i < GrillConstants::NUM_GRILLS; ++i) {
+        if (grills[i] && grills[i]->is_program_running()) {
+            
+            // Cancel the request by reverting to current mode
+            mqtt->print("Program in progress. Mode change denied."); 
+
+            modeManager->requestedMode = modeManager->mode;
+            return;
+        }
+    }
+
+    // If we reach here, it is safe to change mode
+    for (int i = 0; i < GrillConstants::NUM_GRILLS; ++i) {
+        if (grills[i]) {
+            grills[i]->stop_lineal_actuator_raw();
+        }
+    }
+
+    modeManager->confirmMode();
+    Serial.println(newMode == DUAL ? "SYSTEM: DUAL MODE ACTIVATED" : "SYSTEM: SINGLE MODE ACTIVATED");
+}
+
+void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) {
+
+    
+    String topic(pTopic);
+    String payload(pPayload);
+
+    mqtt->print("System message received: " + topic + " -> " + payload);
+
+    if (topic == GrillConstants::TOPIC_CMD_SYS_RESTART) {
+        mqtt->print("Restarting entire system...");
+        // NOTE: Add ESP.restart() here if needed
+        // ESP.restart();
+    }
+    
+    if (topic == GrillConstants::TOPIC_CMD_SYS_SET_MODE)
+    {
+        mqtt->print("Received mode change request..."); 
+
+        if (payload == GrillConstants::PAYLOAD_SINGLE)
+        {
+            modeManager->requestMode(SINGLE);
+        }
+        
+        if (payload == GrillConstants::PAYLOAD_DUAL)
+        {
+            modeManager->requestMode(DUAL);
+        }
+    }
+}
+
+

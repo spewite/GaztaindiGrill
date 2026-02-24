@@ -168,35 +168,30 @@ void handle_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 
     String topicStr(topic);
 
-    // Find the first slash
-    int firstSlash = topicStr.indexOf('/');
-    if (firstSlash == -1) {
-        // Not a valid grill topic, maybe a global one. Ignoring for now.
-        return; 
-    }
+    // Remove the "grill/" prefix
+    if (!topicStr.startsWith("grill/")) return;
+    String remainder = topicStr.substring(6); // What remains after "grill/"
 
-    // Find the second slash, starting after the first one
-    int secondSlash = topicStr.indexOf('/', firstSlash + 1);
-    if (secondSlash == -1) {
-        // This could be a top-level topic like "grill/0/status"
-        // Let's handle that if necessary, or ignore. For now, we only care about action topics.
-        return; 
-    }
+    // Is it for an individual grill? (The next character is a digit)
+    if (remainder.length() > 0 && isDigit(remainder.charAt(0))) {
+        int firstSlash = remainder.indexOf('/');
+        if (firstSlash != -1) {
+            // Extract ID
+            int id = remainder.substring(0, firstSlash).toInt();
+            // Extract the action (everything after the ID)
+            String actionStr = remainder.substring(firstSlash + 1);
 
-    // Extract the ID
-    String idStr = topicStr.substring(firstSlash + 1, secondSlash);
-    int id = idStr.toInt();
-
-    // Extract the rest of the topic as the action
-    String actionStr = topicStr.substring(secondSlash + 1);
-    
-    // Verify that the id is valid before using it
-    if (id >= 0 && id < GrillConstants::NUM_GRILLS) {
-        Grill* grill = grillSystem->get_grill(id);
-        if (grill) {
-            // Convert String to const char* for the function call
-            grill->handle_mqtt_message(actionStr.c_str(), message);
+            if (id >= 0 && id < GrillConstants::NUM_GRILLS) {
+                Grill* grill = grillSystem->get_grill(id);
+                if (grill) {
+                    grill->handle_mqtt_message(actionStr.c_str(), message);
+                }
+            }
         }
+    }
+    // If it's not a digit, it's a SYSTEM command (e.g., "current_mode" or "restart")
+    else {
+        grillSystem->handle_mqtt_message(topic, message);
     }
 }
 
