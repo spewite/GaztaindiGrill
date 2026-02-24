@@ -41,6 +41,9 @@ void DualModeCoordinator::update() {
 
         case RESETTING:
 
+            // Notify the system is resetting
+            client.publish(GrillConstants::TOPIC_RESET_STATUS, GrillConstants::PAYLOAD_RESETTING, true);
+
             // While resetting, check if both have reached the top.
             if (are_both_at_top()) {
                 grill0->stop_lineal_actuator_raw();
@@ -52,6 +55,9 @@ void DualModeCoordinator::update() {
                 // Notify the sensors that this position is the "zero" for dual mode
                 
                 resetState = READY;
+                
+                // Notify the system has been resetted 
+                client.publish(GrillConstants::TOPIC_RESET_STATUS, GrillConstants::PAYLOAD_RESET_READY, true);
             }
             break;
 
