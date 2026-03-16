@@ -4,5 +4,6 @@
         "new": "cpp",
         "cmath": "cpp"
     },
-    "cmake.sourceDirectory": "C:/Users/Izeta/Documents/Gaztaindi/Parrilla/Neria/Programak/GaztaindiGrill/lib/ArduinoJson"
+    "cmake.sourceDirectory": "C:/Users/Izeta/Documents/Gaztaindi/Parrilla/Neria/Programak/GaztaindiGrill/lib/ArduinoJson",
+    "C_Cpp.errorSquiggles": "disabled"
 }
