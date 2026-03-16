@@ -191,7 +191,7 @@ void handle_mqtt_callback(char* topic, byte* payload, unsigned int length) {
     }
     // If it's not a digit, it's a SYSTEM command (e.g., "current_mode" or "restart")
     else {
-        grillSystem->handle_mqtt_message(topic, message);
+        grillSystem->handle_mqtt_message(topicStr.c_str(), message);
     }
 }
 

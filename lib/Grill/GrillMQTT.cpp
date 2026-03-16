@@ -30,7 +30,9 @@ void GrillMQTT::subscribe_to_system_topics() {
     }
 
     // Subscribing to global system topics
-    client.subscribe(GrillConstants::TOPIC_CMD_SYS_SET_MODE);
+    client.subscribe(GrillConstants::TOPIC_CMD_REQ_CURRENT_MODE);
+    client.subscribe(GrillConstants::TOPIC_REQ_MODE_CHANGE);
+    client.subscribe(GrillConstants::TOPIC_CURRENT_MODE);
     client.subscribe(GrillConstants::TOPIC_CMD_SYS_RESTART);
     client.subscribe(GrillConstants::TOPIC_RESET_STATUS);
     

@@ -35,8 +35,11 @@ public:
     // -- Global Topics --
     static constexpr const char* TOPIC_LWT = "grill/connection";
     static constexpr const char* TOPIC_RESET_STATUS = "grill/reset_status";
-    static constexpr const char* TOPIC_CMD_SYS_SET_MODE = "grill/current_mode";
+    static constexpr const char* TOPIC_CURRENT_MODE = "grill/current_mode";
+    static constexpr const char* TOPIC_REQ_MODE_CHANGE = "grill/request_mode_change";
+    static constexpr const char* TOPIC_CMD_REQ_CURRENT_MODE = "grill/request_current_mode";
     static constexpr const char* TOPIC_CMD_SYS_RESTART = "grill/restart";
+    static constexpr const char* TOPIC_MQTT_LOGGER = "grill/mqtt_logger";
     
     // -- Command Topics (Client -> ESP32) --
     // Base: grill/{id}/...

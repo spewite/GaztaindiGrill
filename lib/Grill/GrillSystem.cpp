@@ -147,6 +147,10 @@ void GrillSystem::set_system_mode(Mode newMode) {
 
     modeManager->confirmMode();
     Serial.println(newMode == DUAL ? "SYSTEM: DUAL MODE ACTIVATED" : "SYSTEM: SINGLE MODE ACTIVATED");
+    
+    // Notify the current mode back to the user
+    String currentMode = modeManager->getCurrentMode();
+    mqtt->publish_message(GrillConstants::TOPIC_CURRENT_MODE, currentMode, true); // Retained to ensure new clients get it
 }
 
 void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) {
@@ -155,7 +159,7 @@ void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) 
     String topic(pTopic);
     String payload(pPayload);
 
-    mqtt->print("System message received: " + topic + " -> " + payload);
+    mqtt->print("[GrillSystem::handle_mqtt_message] topic: " + topic);
 
     if (topic == GrillConstants::TOPIC_CMD_SYS_RESTART) {
         mqtt->print("Restarting entire system...");
@@ -163,7 +167,7 @@ void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) 
         // ESP.restart();
     }
     
-    if (topic == GrillConstants::TOPIC_CMD_SYS_SET_MODE)
+    if (topic == GrillConstants::TOPIC_REQ_MODE_CHANGE)
     {
         mqtt->print("Received mode change request..."); 
 
@@ -176,6 +180,13 @@ void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) 
         {
             modeManager->requestMode(DUAL);
         }
+    }
+
+    if (topic == GrillConstants::TOPIC_CMD_REQ_CURRENT_MODE)
+    {
+        mqtt->print("Received current mode publish request..."); 
+        String currentMode = modeManager->getCurrentMode();
+        mqtt->publish_message(GrillConstants::TOPIC_CURRENT_MODE, currentMode, false);
     }
 }
 

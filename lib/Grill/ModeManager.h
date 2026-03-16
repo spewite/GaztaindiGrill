@@ -3,6 +3,9 @@
 #ifndef GRILL_MODE_H
 #define GRILL_MODE_H
 
+#include <Arduino.h>
+#include <GrillConstants.h>
+
 enum Mode {
     SINGLE,
     DUAL
@@ -28,6 +31,10 @@ public:
     void confirmMode() {
         mode = requestedMode;
         dual_direction = STILL;
+    }
+
+    String getCurrentMode() {
+         return this->mode == SINGLE ? GrillConstants::PAYLOAD_SINGLE : GrillConstants::PAYLOAD_DUAL;
     }
     
 private:
