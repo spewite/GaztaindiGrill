@@ -17,8 +17,20 @@ bool DualModeCoordinator::is_dual_mode_active() {
 void DualModeCoordinator::start_reset_sequence() {
     if (resetState == IDLE) {
         resetState = RESETTING;
-        grill0->go_up_raw();
-        grill1->go_up_raw();
+        
+        long pos0 = grill0->get_encoder();
+        long pos1 = grill1->get_encoder();
+
+        if (pos0 < pos1) {
+            grill0->go_up_raw();
+            grill1->stop_lineal_actuator_raw();
+        } else if (pos1 < pos0) {
+            grill1->go_up_raw();
+            grill0->stop_lineal_actuator_raw();
+        } else {
+            grill0->stop_lineal_actuator_raw();
+            grill1->stop_lineal_actuator_raw();
+        }
     }
 }
 
@@ -44,20 +56,29 @@ void DualModeCoordinator::update() {
             // Notify the system is resetting
             client.publish(GrillConstants::TOPIC_RESET_STATUS, GrillConstants::PAYLOAD_RESETTING, true);
 
-            // While resetting, check if both have reached the top.
-            if (are_both_at_top()) {
-                grill0->stop_lineal_actuator_raw();
-                grill1->stop_lineal_actuator_raw();
+            {
+                long pos0 = grill0->get_encoder();
+                long pos1 = grill1->get_encoder();
 
-                grill0->reset_encoder();
-                grill1->reset_encoder();
-                
-                // Notify the sensors that this position is the "zero" for dual mode
-                
-                resetState = READY;
-                
-                // Notify the system has been resetted 
-                client.publish(GrillConstants::TOPIC_RESET_STATUS, GrillConstants::PAYLOAD_RESET_READY, true);
+                // If they are synchronized within the margin, we are ready
+                if (abs(pos0 - pos1) <= GrillConstants::SYNC_MARGIN) {
+                    grill0->stop_lineal_actuator_raw();
+                    grill1->stop_lineal_actuator_raw();
+                    
+                    resetState = READY;
+                    
+                    // Notify the system has been resetted 
+                    client.publish(GrillConstants::TOPIC_RESET_STATUS, GrillConstants::PAYLOAD_RESET_READY, true);
+                } else {
+                    // Keep moving the lower one up
+                    if (pos0 < pos1) {
+                        grill0->go_up_raw();
+                        grill1->stop_lineal_actuator_raw();
+                    } else {
+                        grill1->go_up_raw();
+                        grill0->stop_lineal_actuator_raw();
+                    }
+                }
             }
             break;
 
