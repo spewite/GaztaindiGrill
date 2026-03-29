@@ -172,8 +172,15 @@ void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) 
 
     if (topic == GrillConstants::TOPIC_CMD_SYS_RESTART) {
         mqtt->print("Restarting entire system...");
-        // NOTE: Add ESP.restart() here if needed
-        // ESP.restart();
+        
+        // Notify that the system is starting to reset
+        mqtt->publish_message(GrillConstants::TOPIC_RESET_STATUS, GrillConstants::PAYLOAD_RESETTING, true);
+        
+        // Give some time for the MQTT message to be sent
+        delay(500);
+        
+        // Software restart
+        ESP.restart();
     }
     
     if (topic == GrillConstants::TOPIC_REQ_MODE_CHANGE)
