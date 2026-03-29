@@ -181,7 +181,7 @@ void handle_mqtt_callback(char* topic, byte* payload, unsigned int length) {
             // Extract the action (everything after the ID)
             String actionStr = remainder.substring(firstSlash + 1);
 
-            if (id >= 0 && id < GrillConstants::NUM_GRILLS) {
+            if (id >= 0 && id < GrillConstants::NUM_GRILLS && grillSystem) {
                 Grill* grill = grillSystem->get_grill(id);
                 if (grill) {
                     grill->handle_mqtt_message(actionStr.c_str(), message);
@@ -190,7 +190,7 @@ void handle_mqtt_callback(char* topic, byte* payload, unsigned int length) {
         }
     }
     // If it's not a digit, it's a SYSTEM command (e.g., "current_mode" or "restart")
-    else {
+    else if (grillSystem) {
         grillSystem->handle_mqtt_message(topicStr.c_str(), message);
     }
 }

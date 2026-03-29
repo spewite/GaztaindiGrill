@@ -161,6 +161,15 @@ void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) 
 
     mqtt->print("[GrillSystem::handle_mqtt_message] topic: " + topic);
 
+    if (topic == GrillConstants::TOPIC_CURRENT_MODE) {
+        mqtt->print("Syncing mode from MQTT...");
+        if (payload == GrillConstants::PAYLOAD_SINGLE && modeManager->mode != SINGLE) {
+            modeManager->requestMode(SINGLE);
+        } else if (payload == GrillConstants::PAYLOAD_DUAL && modeManager->mode != DUAL) {
+            modeManager->requestMode(DUAL);
+        }
+    }
+
     if (topic == GrillConstants::TOPIC_CMD_SYS_RESTART) {
         mqtt->print("Restarting entire system...");
         // NOTE: Add ESP.restart() here if needed
