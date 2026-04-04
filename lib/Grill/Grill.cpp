@@ -159,12 +159,6 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
         }
     }
 
-    // Emergency stop is always allowed
-    if (topic == GrillConstants::TOPIC_CMD_SYS_EMERGENCY_STOP) {
-        emergency_stop();
-        return;
-    }
-
     // If resetting, ignore all other commands
     if (is_resetting()) {
         mqtt->print("Grill is resetting, command ignored");
