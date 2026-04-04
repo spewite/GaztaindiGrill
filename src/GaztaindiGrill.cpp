@@ -67,7 +67,13 @@ void setup() {
     client.publish(GrillConstants::TOPIC_RESET_STATUS, GrillConstants::PAYLOAD_RESET_READY, true);
   
 }
+bool ota_active = false;
+
 void loop() {
+    // Handle OTA updates
+    ArduinoOTA.handle();
+
+    if (ota_active) return; // Stop everything else if updating
 
     // Ensure the WiFi connection.
     if (WiFi.status() != WL_CONNECTED) {
@@ -106,6 +112,12 @@ void loop() {
 void connect_to_wifi() {
     Serial.print("Connecting to Wifi...");
     statusLed.setState(LedState::CONNECTING_WIFI);
+
+    WiFi.mode(WIFI_STA); // Station Mode
+    if (!WiFi.config(local_IP, gateway, subnet, dns)) {
+        Serial.println("STA Failed to configure");
+    }
+
     WiFi.config(local_IP, gateway, subnet, dns);
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
@@ -203,6 +215,7 @@ void setup_ota() {
     // ArduinoOTA.setPassword("admin");
 
     ArduinoOTA.onStart([]() {
+        ota_active = true;
         String type;
         if (ArduinoOTA.getCommand() == U_FLASH) {
             type = "sketch";
