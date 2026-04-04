@@ -23,20 +23,21 @@ bool GrillSystem::initialize_system(StatusLED* statusLed) {
 
     // Create system-level MQTT instance
     mqtt = new GrillMQTT(-1);
-    mqtt->subscribe_to_system_topics();
 
     // Setup all grills and start reset simultaneously
     for (int i = 0; i < GrillConstants::NUM_GRILLS; ++i) {
         grills[i] = new Grill(i, modeManager, statusLed);
         if (grills[i]->setup_devices()) {
             Serial.println("The grill " + String(i) + " has been configured correctly. Starting reset...");
-            grills[i]->subscribe_to_topics();
             grills[i]->start_reset(); // Start moving up without blocking
         } else {
             Serial.println("An error has occurred while configuring the devices of grill " + String(i));
             return false;
         }
     }
+
+    // Now that all objects are created, subscribe to everything at once
+    resubscribe_all();
 
     // Wait for all grills to complete reset (non-blocking wait)
     Serial.println("Waiting for all grills to reach top position...");
@@ -217,13 +218,6 @@ void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) 
         String currentMode = modeManager->getCurrentMode();
         mqtt->publish_message(GrillConstants::TOPIC_CURRENT_MODE, currentMode, false);
     }
-
-    // If resetting, ignore all other commands
-    if (is_resetting()) {
-        mqtt->print("Grill is resetting, command ignored");
-        return;
-    }
-
     
     if (topic == GrillConstants::TOPIC_REQ_MODE_CHANGE)
     {
@@ -241,6 +235,17 @@ void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) 
     }
 
 
+}
+
+void GrillSystem::resubscribe_all() {
+    if (mqtt) {
+        mqtt->subscribe_to_system_topics();
+    }
+    for (int i = 0; i < GrillConstants::NUM_GRILLS; ++i) {
+        if (grills[i]) {
+            grills[i]->subscribe_to_topics();
+        }
+    }
 }
 
 

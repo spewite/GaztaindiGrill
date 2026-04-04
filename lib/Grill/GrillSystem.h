@@ -30,6 +30,7 @@ public:
 
     // MQTT Handling
     void handle_mqtt_message(const char* topic, const char* payload);
+    void resubscribe_all();
     
 private:
     Grill* grills[GrillConstants::NUM_GRILLS];

@@ -27,6 +27,7 @@ WiFiClient wifiClient;
 PubSubClient client(wifiClient);
 GrillSystem* grillSystem;
 StatusLED statusLed;
+unsigned long lastConnectedMillis = 0; // Track last time we were online
 
 // Functions declared from the library, otherwise error.
 void connect_to_wifi();
@@ -75,6 +76,25 @@ void loop() {
 
     if (ota_active) return; // Stop everything else if updating
 
+    unsigned long currentMillis = millis();
+
+    // Actualizamos el contador solo si TODO está conectado
+    if (WiFi.status() == WL_CONNECTED && client.connected()) {
+        lastConnectedMillis = currentMillis;
+    } else {
+        // Si llevamos demasiado tiempo desconectados (>30s), reset profundo del WiFi
+        if (currentMillis - lastConnectedMillis > 30000) {
+            Serial.println("Connectivity lost for >30s. Performing deep WiFi reset...");
+            WiFi.disconnect(true, true);
+            WiFi.mode(WIFI_OFF);
+            delay(100);
+            WiFi.mode(WIFI_STA);
+            WiFi.config(local_IP, gateway, subnet, dns);
+            WiFi.begin(ssid, password);
+            lastConnectedMillis = currentMillis; // Reset timer to wait another 30s
+        }
+    }
+
     // Ensure the WiFi connection.
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("WiFi Disconnected. Reconnecting...");
@@ -92,9 +112,6 @@ void loop() {
     // Essential to maintain the MQTT connection and process messages.
     client.loop(); 
     
-    // Handle OTA updates
-    ArduinoOTA.handle();
-
     // Here you can uncomment your additional logic.
     grillSystem->update();
 
@@ -159,6 +176,11 @@ void connect_to_mqtt() {
                 
                 Serial.println("connected to mqtt");
                 client.publish(willTopic, onlineMessage, true);
+
+                // Re-subscribe to all necessary topics
+                if (grillSystem) {
+                    grillSystem->resubscribe_all();
+                }
                 
             } else {
                 Serial.print("failed, rc=");
