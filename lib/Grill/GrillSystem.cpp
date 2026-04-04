@@ -50,8 +50,6 @@ bool GrillSystem::initialize_system(StatusLED* statusLed) {
                 allResetted = false; // At least one grill is still moving
             }
         }
-        
-        statusLed->pulse(3, CRGB::Green, 250, 250, LedState::OFF);
 
         // Process MQTT messages (like emergency stop) and update LEDs
         client.loop();
@@ -60,6 +58,7 @@ bool GrillSystem::initialize_system(StatusLED* statusLed) {
     }
 
     Serial.println("All grills resetted successfully.");
+    statusLed->pulse(3, CRGB::Green, 250, 250, LedState::OFF);
     
     // Initialize dual mode coordinator
     if (GrillConstants::NUM_GRILLS >= 2) {
