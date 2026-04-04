@@ -195,7 +195,6 @@ void MovementManager::handle_temperature_stop() {
 
 void MovementManager::start_reset()
 {
-    statusLed->setState(LedState::RESETING);
     isLinearResetting = true;
     go_up(); 
     mqtt->print("Moving linear actuators to top");
@@ -208,7 +207,6 @@ bool MovementManager::check_reset_status()
         hardware->reset_encoder(hardware->encoder);
         sensor->update_encoder();
         isLinearResetting = false;
-        statusLed->pulse(3, CRGB::Green, 250, 250, LedState::OFF);
         return true;
     }
     return false;

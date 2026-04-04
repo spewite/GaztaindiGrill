@@ -29,6 +29,7 @@ bool GrillSystem::initialize_system(StatusLED* statusLed) {
         grills[i] = new Grill(i, modeManager, statusLed);
         if (grills[i]->setup_devices()) {
             Serial.println("The grill " + String(i) + " has been configured correctly. Starting reset...");
+            statusLed->setState(LedState::RESETING);
             grills[i]->start_reset(); // Start moving up without blocking
         } else {
             Serial.println("An error has occurred while configuring the devices of grill " + String(i));
@@ -50,6 +51,8 @@ bool GrillSystem::initialize_system(StatusLED* statusLed) {
             }
         }
         
+        statusLed->pulse(3, CRGB::Green, 250, 250, LedState::OFF);
+
         // Process MQTT messages (like emergency stop) and update LEDs
         client.loop();
         statusLed->update();
