@@ -34,6 +34,7 @@ void GrillMQTT::subscribe_to_system_topics() {
     client.subscribe(GrillConstants::TOPIC_REQ_MODE_CHANGE);
     client.subscribe(GrillConstants::TOPIC_CURRENT_MODE);
     client.subscribe(GrillConstants::TOPIC_CMD_SYS_RESTART);
+    client.subscribe(GrillConstants::TOPIC_CMD_SYS_EMERGENCY_STOP);
     client.subscribe(GrillConstants::TOPIC_RESET_STATUS);
     
     Serial.println("Subscribed to System MQTT Topics");

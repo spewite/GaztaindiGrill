@@ -11,7 +11,8 @@ MovementManager::MovementManager(int index, GrillMQTT* mqtt, HardwareManager* ha
     targetPosition(GrillConstants::NO_TARGET),
     targetDegrees(GrillConstants::NO_TARGET),
     targetTemperature(GrillConstants::NO_TARGET),
-    statusLed(statusLed)
+    statusLed(statusLed),
+    isLinearResetting(false)
      {}
 
 
@@ -33,6 +34,7 @@ void MovementManager::go_up_raw() {
 }
 
 void MovementManager::go_down() {
+
     if (modeManager->mode == DUAL)
     {
         modeManager->dual_direction = DOWNWARDS;
@@ -191,75 +193,41 @@ void MovementManager::handle_temperature_stop() {
 ///             RESET SYSTEMS            /// 
 /// ------------------------------------ ///
 
-void MovementManager::reset_system() {
-    
-    // Start led indicator
+void MovementManager::start_reset()
+{
     statusLed->setState(LedState::RESETING);
-
-    mqtt->print("Resetting devices for grill " + String(grillIndex));   
-
-    // ------------- RESET ROTOR ------------- //
-    if (index == 0)
-    {
-        // reset_rotor(); 
-    }
-
-    // ------------- RESET LINEAL ACTUATOR ------------- //
-    reset_linear_actuators();
-    
-    // ------------- RESET ENCODER ------------- //
-    hardware->reset_encoder(hardware->encoder);
-    sensor->update_encoder();
-
-    mqtt->print("Devices reset");  
-    
-    // Stop led indicator
-    statusLed->pulse(3, CRGB::Green, 250, 250, LedState::OFF);
-    
-}
-
-void MovementManager::reset_rotor()
-{
-    mqtt->print("Resetting rotor");
-    rotate_clockwise();
-
-    // To avoid printing the message all the time, make a non-blocking delay so it can receive MQTT
-    unsigned long previousMessageMillis = 0;
-    
-    while (!sensor->limit_switch_pressed(PIN_CS_LIMIT_ROTOR)) {
-        unsigned long currentMillis = millis();
-        if (currentMillis - previousMessageMillis >= GrillConstants::RESET_TIMEOUT) {
-            previousMessageMillis = currentMillis;
-            mqtt->print("Resetting rotor...");
-        }
-        client.loop();
-    }
-
-    stop_rotor();
-    hardware->reset_rotor_encoder();
-}
-
-void MovementManager::reset_linear_actuators()
-{
+    isLinearResetting = true;
     go_up(); 
     mqtt->print("Moving linear actuators to top");
+}
 
-    // To avoid printing the message all the time, make a non-blocking delay so it can receive MQTT
-    unsigned long previousMessageMillis = 0;
-
-    while (!sensor->is_at_top()) {
-        
-        unsigned long currentMillis = millis();
-        if (currentMillis - previousMessageMillis >= GrillConstants::RESET_TIMEOUT) {
-            previousMessageMillis = currentMillis;
-            mqtt->print("Moving linear actuators to top...");
-        }
-        client.loop();
-        statusLed->update();
+bool MovementManager::check_reset_status()
+{
+    if (sensor->is_at_top()) {
+        stop_lineal_actuator();
+        hardware->reset_encoder(hardware->encoder);
+        sensor->update_encoder();
+        isLinearResetting = false;
+        statusLed->pulse(3, CRGB::Green, 250, 250, LedState::OFF);
+        return true;
     }
+    return false;
+}
 
-    mqtt->print("Linear actuators at top");
+void MovementManager::emergency_stop()
+{
     stop_lineal_actuator();
+    stop_rotor();
+    isLinearResetting = false;
+    targetTemperature = GrillConstants::NO_TARGET;
+    targetDegrees = GrillConstants::NO_TARGET;
+    targetPosition = GrillConstants::NO_TARGET;
+    mqtt->print("EMERGENCY STOP EXECUTED");
+}
+
+bool MovementManager::is_resetting()
+{
+    return isLinearResetting;
 }
 
 bool MovementManager::has_any_active_target() {

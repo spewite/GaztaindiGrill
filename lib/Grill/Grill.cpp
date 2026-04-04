@@ -31,8 +31,20 @@ bool Grill::setup_devices() {
 }
 
 
-void Grill::reset_system() {
-    movement->reset_system();
+void Grill::start_reset() {
+    movement->start_reset();
+}
+
+bool Grill::check_reset_status() {
+    return movement->check_reset_status();
+}
+
+void Grill::emergency_stop() {
+    movement->emergency_stop();
+}
+
+bool Grill::is_resetting() {
+    return movement->is_resetting();
 }
 
 void Grill::reset_encoder() {
@@ -147,6 +159,18 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
         }
     }
 
+    // Emergency stop is always allowed
+    if (topic == GrillConstants::TOPIC_CMD_SYS_EMERGENCY_STOP) {
+        emergency_stop();
+        return;
+    }
+
+    // If resetting, ignore all other commands
+    if (is_resetting()) {
+        mqtt->print("Grill is resetting, command ignored");
+        return;
+    }
+
     if (topic == GrillConstants::TOPIC_CMD_MOVE_VERTICAL) {
         if (payload == GrillConstants::PAYLOAD_UP) {
             movement->go_up();
@@ -172,10 +196,6 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
         movement->go_to(posicion);
     }
     
-    if (topic == GrillConstants::TOPIC_CMD_SYS_RESTART) {
-        mqtt->print("Restarting system...");
-        // NOTE: Add ESP.restart() here if needed
-    }
     
     if (topic == GrillConstants::TOPIC_CMD_PROG_EXECUTE) {
         mqtt->print("Executing a program..."); 

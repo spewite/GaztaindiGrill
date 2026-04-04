@@ -40,6 +40,7 @@ public:
     static constexpr const char* TOPIC_REQ_MODE_CHANGE = "grill/request_mode_change";
     static constexpr const char* TOPIC_CMD_REQ_CURRENT_MODE = "grill/request_current_mode";
     static constexpr const char* TOPIC_CMD_SYS_RESTART = "grill/restart";
+    static constexpr const char* TOPIC_CMD_SYS_EMERGENCY_STOP = "grill/emergency_stop";
     static constexpr const char* TOPIC_MQTT_LOGGER = "grill/mqtt_logger";
     
     // -- Command Topics (Client -> ESP32) --

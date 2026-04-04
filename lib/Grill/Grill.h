@@ -26,8 +26,13 @@ public:
 
     // Setup
     bool setup_devices();
-    void reset_system();
     void reset_encoder();
+
+    void start_reset();
+    bool check_reset_status();
+    bool check_rotor_reset_status();
+    void emergency_stop();
+    bool is_resetting();
     
     // Movement
     void go_up_raw();

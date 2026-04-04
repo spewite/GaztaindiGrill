@@ -25,18 +25,37 @@ bool GrillSystem::initialize_system(StatusLED* statusLed) {
     mqtt = new GrillMQTT(-1);
     mqtt->subscribe_to_system_topics();
 
-    // Grill instantiation & start
+    // Setup all grills and start reset simultaneously
     for (int i = 0; i < GrillConstants::NUM_GRILLS; ++i) {
         grills[i] = new Grill(i, modeManager, statusLed);
         if (grills[i]->setup_devices()) {
-            Serial.println("The grill " + String(i) + " has been configured correctly");
-            grills[i]->reset_system();
+            Serial.println("The grill " + String(i) + " has been configured correctly. Starting reset...");
             grills[i]->subscribe_to_topics();
+            grills[i]->start_reset(); // Start moving up without blocking
         } else {
             Serial.println("An error has occurred while configuring the devices of grill " + String(i));
             return false;
         }
     }
+
+    // Wait for all grills to complete reset (non-blocking wait)
+    Serial.println("Waiting for all grills to reach top position...");
+    bool allResetted = false;
+    while (!allResetted) {
+        allResetted = true;
+        for (int i = 0; i < GrillConstants::NUM_GRILLS; ++i) {
+            if (grills[i] && !grills[i]->check_reset_status()) {
+                allResetted = false; // At least one grill is still moving
+            }
+        }
+        
+        // Process MQTT messages (like emergency stop) and update LEDs
+        client.loop();
+        statusLed->update();
+        delay(10);
+    }
+
+    Serial.println("All grills resetted successfully.");
     
     // Initialize dual mode coordinator
     if (GrillConstants::NUM_GRILLS >= 2) {
@@ -182,6 +201,29 @@ void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) 
         // Software restart
         ESP.restart();
     }
+
+    if (topic == GrillConstants::TOPIC_CMD_SYS_EMERGENCY_STOP) {
+        mqtt->print("GLOBAL EMERGENCY STOP RECEIVED");
+        for (int i = 0; i < GrillConstants::NUM_GRILLS; ++i) {
+            if (grills[i]) {
+                grills[i]->emergency_stop();
+            }
+        }
+    }
+    
+    if (topic == GrillConstants::TOPIC_CMD_REQ_CURRENT_MODE)
+    {
+        mqtt->print("Received current mode publish request..."); 
+        String currentMode = modeManager->getCurrentMode();
+        mqtt->publish_message(GrillConstants::TOPIC_CURRENT_MODE, currentMode, false);
+    }
+
+    // If resetting, ignore all other commands
+    if (is_resetting()) {
+        mqtt->print("Grill is resetting, command ignored");
+        return;
+    }
+
     
     if (topic == GrillConstants::TOPIC_REQ_MODE_CHANGE)
     {
@@ -198,12 +240,7 @@ void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) 
         }
     }
 
-    if (topic == GrillConstants::TOPIC_CMD_REQ_CURRENT_MODE)
-    {
-        mqtt->print("Received current mode publish request..."); 
-        String currentMode = modeManager->getCurrentMode();
-        mqtt->publish_message(GrillConstants::TOPIC_CURRENT_MODE, currentMode, false);
-    }
+
 }
 
 

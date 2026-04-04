@@ -31,9 +31,10 @@ public:
     void go_to_rotor(int grades);
 
     // ------------------- RESETS ------------------ //
-    void reset_rotor();
-    void reset_linear_actuators();
-    void reset_system();
+    void start_reset();
+    bool check_reset_status();
+    void emergency_stop();
+    bool is_resetting();
 
     // ---- HANDLE STOPS (GO_TO / PROGRAM) ---- //
     void handle_rotor_stop();
@@ -49,6 +50,7 @@ public:
 private:
 
     int grillIndex;
+    bool isLinearResetting;
 
     StatusLED* statusLed;
     GrillMQTT* mqtt;
