@@ -159,11 +159,21 @@ void ProgramManager::start_current_step() {
         stepState = STEP_MOVING_TO_TARGET;
     } else if (step.position != -1) {
         // Movimiento por posición
-        movement->go_to(step.position);
+        int targetPos = step.position;
+        if (currentProgram.isRelative) {
+            targetPos = currentProgram.startPosition + step.position;
+            if (targetPos < 0) targetPos = 0;
+            if (targetPos > 100) targetPos = 100;
+        }
+        movement->go_to(targetPos);
         stepState = STEP_MOVING_TO_TARGET;
     } else if (step.rotation != -1) {
         // Movimiento por rotación
-        movement->go_to_rotor(step.rotation);
+        int targetRot = step.rotation;
+        if (currentProgram.isRelative) {
+            targetRot = ((currentProgram.startRotation + step.rotation) % 360 + 360) % 360;
+        }
+        movement->go_to_rotor(targetRot);
         stepState = STEP_MOVING_TO_TARGET;
     } else {
         // Si es un paso de "Solo Tiempo" (sin movimientos ni acciones)
@@ -254,5 +264,7 @@ void ProgramManager::publish_program_status() {
     serializeJson(doc, jsonOutput);
     
     String responseTopic = mqtt->parse_topic(GrillConstants::TOPIC_STATE_PROG_CURRENT);
+    mqtt->publish_message(responseTopic, jsonOutput.c_str(), true);
+}String responseTopic = mqtt->parse_topic(GrillConstants::TOPIC_STATE_PROG_CURRENT);
     mqtt->publish_message(responseTopic, jsonOutput.c_str(), true);
 }

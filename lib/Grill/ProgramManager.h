@@ -22,6 +22,9 @@ struct Program {
     String creatorName;
     int usageCount = 0;
     int stepsCount = 0;
+    bool isRelative = false;
+    int startPosition = -1;
+    int startRotation = -1;
     Step steps[GrillConstants::MAX_PROGRAM_STEPS];
 };
 
