@@ -36,10 +36,6 @@ public:
     void emergency_stop();
     bool is_resetting();
 
-    // ------------------- GETTERS ------------------ //
-    int get_current_position();
-    int get_current_rotation();
-
     // ---- HANDLE STOPS (GO_TO / PROGRAM) ---- //
     void handle_rotor_stop();
     void handle_position_stop();
