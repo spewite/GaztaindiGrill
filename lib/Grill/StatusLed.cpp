@@ -92,7 +92,7 @@ void StatusLED::update() {
         case LedState::OFF:
             fill_solid(leds, NUM_STATUS_LEDS, CRGB::Black);
             break;
-        case LedState::CONNECTING_WIFI:
+        case LedState::CONNECTING_INTERNET:
             blink(CRGB::Orange, 300);
             break;
         case LedState::CONNECTING_MQTT:

@@ -1,9 +1,9 @@
-#include <Arduino.h>  
+#include <Arduino.h>
 #include <Wire.h>
 #include <SPI.h>
-#include <WiFi.h>
+#include <Ethernet.h>
 #include <PubSubClient.h>
-#include <ArduinoOTA.h>
+#include <EthernetOTA.h>
 #include <time.h>
 
 #include <GrillConstants.h>
@@ -19,10 +19,9 @@ PubSubClient client(ethClient);
 EthernetOTA ethOTA;
 GrillSystem* grillSystem;
 StatusLED statusLed;
-unsigned long lastConnectedMillis = 0; // Track last time we were online
 
 // Functions declared from the library, otherwise error.
-void connect_to_wifi();
+void connect_to_ethernet();
 void connect_to_mqtt();
 void setup_ota();
 void handle_mqtt_callback(char* topic, byte* payload, unsigned int length);
@@ -36,8 +35,8 @@ void setup() {
     // Start status led
     statusLed.begin();
 
-    // WIFI & MQTT connection
-    connect_to_wifi();
+    // ETHERNET & MQTT connection
+    connect_to_ethernet();
     setup_ota();
     client.setCallback(handle_mqtt_callback);
     connect_to_mqtt();
@@ -63,34 +62,20 @@ void setup() {
 bool ota_active = false;
 
 void loop() {
-    // Handle OTA updates
-    ArduinoOTA.handle();
+    // Handle OTA updates (HTTP over the W5500). Reboots internally on success.
+    if (ethOTA.handle()) return;
 
     if (ota_active) return; // Stop everything else if updating
 
-    unsigned long currentMillis = millis();
+    // Renew DHCP lease if applicable (no-op with a static IP, but harmless).
+    Ethernet.maintain();
 
-    // Actualizamos el contador solo si TODO está conectado
-    if (WiFi.status() == WL_CONNECTED && client.connected()) {
-        lastConnectedMillis = currentMillis;
-    } else {
-        // Si llevamos demasiado tiempo desconectados (>30s), reset profundo del WiFi
-        if (currentMillis - lastConnectedMillis > 30000) {
-            Serial.println("Connectivity lost for >30s. Performing deep WiFi reset...");
-            WiFi.disconnect(true, true);
-            WiFi.mode(WIFI_OFF);
-            delay(100);
-            WiFi.mode(WIFI_STA);
-            WiFi.config(local_IP, gateway, subnet, dns);
-            WiFi.begin(ssid, password);
-            lastConnectedMillis = currentMillis; // Reset timer to wait another 30s
-        }
-    }
-
-    // Ensure the WiFi connection.
-    if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("WiFi Disconnected. Reconnecting...");
-        connect_to_wifi();
+    // Ensure the physical Ethernet link is up.
+    if (Ethernet.linkStatus() == LinkOFF) {
+        Serial.println("Ethernet cable disconnected. Waiting for link...");
+        statusLed.setState(LedState::CONNECTING_INTERNET);
+        statusLed.update();
+        delay(200);
         return;
     }
 
@@ -102,8 +87,8 @@ void loop() {
     }
 
     // Essential to maintain the MQTT connection and process messages.
-    client.loop(); 
-    
+    client.loop();
+
     // Here you can uncomment your additional logic.
     grillSystem->update();
 
@@ -111,80 +96,87 @@ void loop() {
     statusLed.update();
 
     // You can add a small delay to avoid saturating the loop.
-    delay(10); 
+    delay(10);
 }
 
 /// -------------------------------- ///
-///             MQTT & WIFI          /// 
+///           MQTT & ETHERNET        ///
 /// -------------------------------- ///
 
-void connect_to_wifi() {
-    Serial.print("Connecting to Wifi...");
-    statusLed.setState(LedState::CONNECTING_WIFI);
+void connect_to_ethernet() {
+    Serial.print("Starting Ethernet (W5500)...");
+    statusLed.setState(LedState::CONNECTING_INTERNET);
 
-    WiFi.mode(WIFI_STA); // Station Mode
-    if (!WiFi.config(local_IP, gateway, subnet, dns)) {
-        Serial.println("STA Failed to configure");
+    // Tell the Ethernet library which pin is the W5500 chip-select.
+    Ethernet.init(PIN_W5500_CS);
+
+    // Static configuration (same IP the device used over WiFi).
+    Ethernet.begin(ETH_MAC, ETH_LOCAL_IP, ETH_DNS, ETH_GATEWAY, ETH_SUBNET);
+
+    if (Ethernet.hardwareStatus() == EthernetNoHardware) {
+        Serial.println("\nERROR: W5500 not detected! Check SPI wiring / CS (GPIO2) / power.");
+        statusLed.setState(LedState::ERROR);
+        return;
     }
 
-    WiFi.config(local_IP, gateway, subnet, dns);
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
+    // Wait (with a timeout) for the physical link to come up.
+    unsigned long start = millis();
+    while (Ethernet.linkStatus() == LinkOFF && millis() - start < 15000) {
+        delay(250);
         Serial.print(".");
         statusLed.update();
-    } 
-    Serial.println("WiFi connected: " + WiFi.localIP().toString());
-}
-void connect_to_mqtt() {
-    
-    statusLed.setState(LedState::CONNECTING_MQTT);
-    client.setServer(mqttServer, mqttPort);
-    client.setKeepAlive(8); // Time that will trigger LWT.
-
-    unsigned long lastMqttAttempt = 0; // Variable to control the time of the last attempt
-
-    while (!client.connected()) {
-        statusLed.update(); 
-
-        // Only attempt to connect every 5 seconds
-        if (millis() - lastMqttAttempt > 5000) {
-            lastMqttAttempt = millis(); // Updates the time of the last attempt
-            
-            Serial.print("Attempting MQTT connection...");
-            
-            // LWT configuration
-            const char* willTopic     = GrillConstants::TOPIC_LWT;
-            const char* onlineMessage = GrillConstants::PAYLOAD_LWT_ONLINE;
-            const char* willMessage   = GrillConstants::PAYLOAD_LWT_OFFLINE;
-            int willQoS               = 1;
-            bool willRetain           = true;
-
-            if (client.connect(
-                "ESP32Client", 
-                mqttUser, mqttPassword,
-                willTopic, willQoS, willRetain, willMessage
-            )) {
-                
-                Serial.println("connected to mqtt");
-                client.publish(willTopic, onlineMessage, true);
-
-                // Re-subscribe to all necessary topics
-                if (grillSystem) {
-                    grillSystem->resubscribe_all();
-                }
-                
-            } else {
-                Serial.print("failed, rc=");
-                Serial.print(client.state());
-                Serial.println(" try again in 5 seconds");
-            }
-        }
     }
 
-    // Pulse 
-    statusLed.pulse(3, CRGB::Green, 250, 250, LedState::OFF);
+    Serial.println("\nEthernet ready. IP: " + Ethernet.localIP().toString());
+}
+// Non-blocking single MQTT connection attempt (throttled to once every 5s).
+// IMPORTANT: this must NOT block. setup()/loop() need to keep calling
+// ethOTA.handle() so the device stays flashable even if the broker is down.
+void connect_to_mqtt() {
 
+    static unsigned long lastMqttAttempt = 0;
+
+    if (client.connected()) { return; }
+
+    // Throttle: at most one attempt every 5s (but allow the very first attempt).
+    if (lastMqttAttempt != 0 && millis() - lastMqttAttempt < 5000) { return; }
+    lastMqttAttempt = millis();
+
+    statusLed.setState(LedState::CONNECTING_MQTT);
+    statusLed.update();
+    client.setServer(MQTT_SERVER, MQTT_PORT);
+    client.setKeepAlive(8); // Time that will trigger LWT.
+
+    Serial.print("Attempting MQTT connection...");
+
+    // LWT configuration
+    const char* willTopic     = GrillConstants::TOPIC_LWT;
+    const char* onlineMessage = GrillConstants::PAYLOAD_LWT_ONLINE;
+    const char* willMessage   = GrillConstants::PAYLOAD_LWT_OFFLINE;
+    int willQoS               = 1;
+    bool willRetain           = true;
+
+    if (client.connect(
+            "ESP32Client",
+            MQTT_USER, MQTT_PASSWORD,
+            willTopic, willQoS, willRetain, willMessage
+        )) {
+
+        Serial.println("connected to mqtt");
+        client.publish(willTopic, onlineMessage, true);
+
+        // Re-subscribe to all necessary topics
+        if (grillSystem) {
+            grillSystem->resubscribe_all();
+        }
+
+        statusLed.pulse(3, CRGB::Green, 250, 250, LedState::OFF);
+
+    } else {
+        Serial.print("failed, rc=");
+        Serial.print(client.state());
+        Serial.println(" try again in 5 seconds");
+    }
 }
 
 void handle_mqtt_callback(char* topic, byte* payload, unsigned int length) {
@@ -222,52 +214,45 @@ void handle_mqtt_callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void setup_ota() {
-    // Hostname defaults to esp3232-[MAC]
-    ArduinoOTA.setHostname("GaztaindiGrill-OTA");
+    // HTTP OTA over the W5500 (POST /update on port 3232).
+    // Optional: ethOTA.setAuthToken("changeme"); // require header "X-Auth: changeme"
 
-    // No password by default
-    // ArduinoOTA.setPassword("admin");
-
-    ArduinoOTA.onStart([]() {
+    ethOTA.onStart([]() {
         ota_active = true;
-        String type;
-        if (ArduinoOTA.getCommand() == U_FLASH) {
-            type = "sketch";
-        } else { // U_SPIFFS
-            type = "filesystem";
+        statusLed.setState(LedState::CONNECTING_INTERNET);
+        Serial.println("OTA: start updating firmware");
+    });
+
+    ethOTA.onProgress([](size_t done, size_t total) {
+        if (total > 0) {
+            Serial.printf("OTA Progress: %u%%\r", (unsigned)(done * 100 / total));
         }
-        // NOTE: if updating SPIFFS this would be the place to unmount SPIFFS using SPIFFS.end()
-        Serial.println("Start updating " + type);
+        statusLed.update();
     });
 
-    ArduinoOTA.onEnd([]() {
-        Serial.println("\nEnd");
+    ethOTA.onEnd([](bool success, const String& message) {
+        if (success) {
+            Serial.println("\nOTA: update complete");
+        } else {
+            ota_active = false;
+            statusLed.setState(LedState::ERROR);
+            Serial.println("\nOTA: failed - " + message);
+        }
     });
 
-    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-    });
-
-    ArduinoOTA.onError([](ota_error_t error) {
-        Serial.printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-        else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-        else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-        else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-        else if (error == OTA_END_ERROR) Serial.println("End Failed");
-    });
-
-    ArduinoOTA.begin();
-    Serial.println("OTA ready.");
+    ethOTA.begin(OTA_PORT);
+    Serial.println("OTA ready (HTTP POST /update on port " + String(OTA_PORT) + ").");
 }
 
 void setup_time() {
-    // Configura los servidores NTP y la zona horaria.
-    // "pool.ntp.org" es el servidor estándar. 
-    // Los ceros finales son para el offset de hora de verano si no usas una cadena de zona horaria.
+    // NOTE: configTime() uses the ESP32 lwIP stack (the old WiFi path). With the
+    // W5500 (which has its own TCP/IP stack) there is no lwIP route to the
+    // internet, so NTP will NOT sync over Ethernet. The grill keeps working
+    // (step durations use millis()); only the wall-clock "stepStartUnix" sent to
+    // the client stays unsynced until an NTP-over-Ethernet client is added.
     configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-    
-    // Configurar zona horaria de España (CET/CEST)
+
+    // Spain timezone (CET/CEST)
     setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
     tzset();
 }

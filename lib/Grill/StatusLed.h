@@ -9,7 +9,7 @@
 // Defines the possible states of the status LED.
 enum class LedState {
     OFF,
-    CONNECTING_WIFI,
+    CONNECTING_INTERNET,
     CONNECTING_MQTT,
     PULSING,
     RESETING,
