@@ -42,6 +42,7 @@ public:
     static constexpr const char* TOPIC_CMD_SYS_RESTART = "grill/restart";
     static constexpr const char* TOPIC_CMD_SYS_EMERGENCY_STOP = "grill/emergency_stop";
     static constexpr const char* TOPIC_MQTT_LOGGER = "grill/mqtt_logger";
+    static constexpr const char* TOPIC_TIME = "grill/time"; // current UTC unix time (retained)
     
     // -- Command Topics (Client -> ESP32) --
     // Base: grill/{id}/...

@@ -4,6 +4,7 @@
 #include <Ethernet.h>
 #include <PubSubClient.h>
 #include <EthernetOTA.h>
+#include <EthernetNTP.h>
 #include <time.h>
 
 #include <GrillConstants.h>
@@ -17,6 +18,7 @@
 EthernetClient ethClient;
 PubSubClient client(ethClient);
 EthernetOTA ethOTA;
+EthernetNTP ntp;
 GrillSystem* grillSystem;
 StatusLED statusLed;
 
@@ -26,6 +28,7 @@ void connect_to_mqtt();
 void setup_ota();
 void handle_mqtt_callback(char* topic, byte* payload, unsigned int length);
 void setup_time();
+void publish_time();
 
 void setup() {
 
@@ -77,6 +80,12 @@ void loop() {
         statusLed.update();
         delay(200);
         return;
+    }
+
+    // Best-effort time sync over Ethernet (non-blocking). Runs even when the
+    // MQTT broker is unreachable. Publish the new time if we are connected.
+    if (ntp.update() && client.connected()) {
+        publish_time();
     }
 
     // Check the MQTT connection.
@@ -170,6 +179,9 @@ void connect_to_mqtt() {
             grillSystem->resubscribe_all();
         }
 
+        // Make the (already synced) time visible to clients on reconnect.
+        publish_time();
+
         statusLed.pulse(3, CRGB::Green, 250, 250, LedState::OFF);
 
     } else {
@@ -245,14 +257,20 @@ void setup_ota() {
 }
 
 void setup_time() {
-    // NOTE: configTime() uses the ESP32 lwIP stack (the old WiFi path). With the
-    // W5500 (which has its own TCP/IP stack) there is no lwIP route to the
-    // internet, so NTP will NOT sync over Ethernet. The grill keeps working
-    // (step durations use millis()); only the wall-clock "stepStartUnix" sent to
-    // the client stays unsynced until an NTP-over-Ethernet client is added.
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-
-    // Spain timezone (CET/CEST)
-    setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
+    // Time is synced over Ethernet via NTP (see EthernetNTP / ntp.update() in the
+    // loop). The system clock is kept in UTC; the TZ env converts to local time
+    // for any localtime() calls. The actual sync happens asynchronously once the
+    // link is up, so this just configures the timezone and starts the client.
+    setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1); // Spain (CET/CEST)
     tzset();
+
+    ntp.begin(NTP_SERVER);
+}
+
+// Publishes the current UTC unix time (retained) so clients can read the
+// synced clock. No-op until NTP has synced at least once.
+void publish_time() {
+    if (!ntp.isSynced() || !client.connected()) { return; }
+    time_t nowUtc = time(nullptr);
+    client.publish(GrillConstants::TOPIC_TIME, String((uint32_t)nowUtc).c_str(), true);
 }
