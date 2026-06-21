@@ -11,20 +11,12 @@
 #include <GrillSystem.h>
 #include <StatusLED.h>
 
-const char* ssid = "Gaztaindi";
-const char* password = "Gaztaindi"; 
-const IPAddress local_IP(192, 168, 1, 100);
-const IPAddress gateway(192, 168, 1, 1);
-const IPAddress subnet(255, 255, 255, 0);  
-const IPAddress dns(8, 8, 8, 8);
+// Network configuration (W5500 CS pin, static IP, MQTT credentials, OTA port)
+// lives in GRILL_config.h / GRILL_config.cpp.
 
-const char* mqttServer = "192.168.1.76"; 
-const int mqttPort = 1883;  
-const char* mqttUser = "gaztaindi";
-const char* mqttPassword = "gaztaindi";
-
-WiFiClient wifiClient;
-PubSubClient client(wifiClient);
+EthernetClient ethClient;
+PubSubClient client(ethClient);
+EthernetOTA ethOTA;
 GrillSystem* grillSystem;
 StatusLED statusLed;
 unsigned long lastConnectedMillis = 0; // Track last time we were online
