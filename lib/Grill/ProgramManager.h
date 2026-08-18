@@ -4,13 +4,14 @@
 #include <ArduinoJson.h>
 #include <GrillMQTT.h>
 #include <MovementManager.h>
+#include <GrillSensor.h>
 #include <Utils.h>
 #include <StatusLED.h>
 
 struct Step {
     int time;
     int temperature;
-    int position;
+    int position; // GrillConstants::NO_TARGET if not set. Meaning (absolute % or relative delta) depends on Program::referenceType.
     int rotation;
     String action;
 };
@@ -22,12 +23,13 @@ struct Program {
     String creatorName;
     int usageCount = 0;
     int stepsCount = 0;
+    String referenceType = GrillConstants::PAYLOAD_REFERENCE_TYPE_ABSOLUTE;
     Step steps[GrillConstants::MAX_PROGRAM_STEPS];
 };
 
 class ProgramManager {
 public:
-    ProgramManager(int index, GrillMQTT* mqtt, MovementManager* movement, StatusLED* statusLed);
+    ProgramManager(int index, GrillMQTT* mqtt, MovementManager* movement, GrillSensor* sensor, StatusLED* statusLed);
 
     // ----------------- PROGRAMS ----------------- //
     void update_program();
@@ -42,6 +44,7 @@ private:
 
     GrillMQTT* mqtt;
     MovementManager* movement;
+    GrillSensor* sensor;
     StatusLED* statusLed;
 
     // Por ahora solo se use el IDLE. Se deberia quitar esto? 
@@ -66,12 +69,14 @@ private:
     void check_time_elapsed();
     void execute_current_action();
     void advance_to_next_step();
-    
+    int resolve_target_position(int stepPosition);
+
     Program currentProgram;
 
     int programCurrentStep;
     unsigned long stepDurationStart;
     uint32_t stepStartUnix; // Timestamp of when a step started (this is to indicate in the client how many seconds has being executing)
+    int positionAnchor; // Grill position (0-100%) captured at execute_program(); used as the base for "relative" referenceType.
 };
 
 #endif

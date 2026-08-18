@@ -72,6 +72,7 @@ public:
     static constexpr const char* JSON_POSITION = "position";
     static constexpr const char* JSON_ROTATION = "rotation";
     static constexpr const char* JSON_ACTION = "action";
+    static constexpr const char* JSON_REFERENCE_TYPE = "referenceType";
 
 
     // General payloads
@@ -90,6 +91,10 @@ public:
     static constexpr const char* PAYLOAD_COUNTER_CLOCKWISE = "counter_clockwise";
     static constexpr const char* PAYLOAD_SINGLE = "single";
     static constexpr const char* PAYLOAD_DUAL = "dual";
+
+    // Program reference type payloads
+    static constexpr const char* PAYLOAD_REFERENCE_TYPE_ABSOLUTE = "absolute";
+    static constexpr const char* PAYLOAD_REFERENCE_TYPE_RELATIVE = "relative";
 };
 
 #endif

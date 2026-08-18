@@ -19,6 +19,12 @@ long GrillSensor::get_encoder_value() {
     return encoderValue;
 }
 
+// Last reading accepted by update_encoder(): never ENCODER_ERROR, at most one loop old.
+// For one-shot callers that cannot retry, e.g. the relative-mode anchor in ProgramManager.
+long GrillSensor::get_last_known_position() {
+    return lastEncoderValue;
+}
+
 void GrillSensor::update_encoder() {
     long encoderValue = get_encoder_value();
     if (encoderValue == GrillConstants::ENCODER_ERROR || encoderValue == lastEncoderValue) { return; }

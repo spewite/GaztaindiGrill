@@ -1,13 +1,15 @@
 #include <ProgramManager.h>
 
-ProgramManager::ProgramManager(int index, GrillMQTT* mqtt, MovementManager* movement, StatusLED* statusLed) : 
+ProgramManager::ProgramManager(int index, GrillMQTT* mqtt, MovementManager* movement, GrillSensor* sensor, StatusLED* statusLed) :
     grillIndex(index),
     mqtt(mqtt),
     movement(movement),
+    sensor(sensor),
     statusLed(statusLed),
     programCurrentStep(0),
     stepDurationStart(0),
-    stepStartUnix(0)
+    stepStartUnix(0),
+    positionAnchor(0)
      {}
 
     
@@ -31,7 +33,16 @@ void ProgramManager::execute_program(const char* jsonPayload) {
     currentProgram.name = doc["name"] | "";
     currentProgram.creatorName = doc["creatorName"] | "";
     currentProgram.usageCount = doc["usageCount"] | -1;
-    mqtt->print("Executing program with ID: " + String(currentProgram.id));
+    currentProgram.referenceType = doc[GrillConstants::JSON_REFERENCE_TYPE] | GrillConstants::PAYLOAD_REFERENCE_TYPE_ABSOLUTE;
+
+    // Anchor for "relative" referenceType: the grill's position right now, before the program moves it.
+    // Uses the filtered last-known reading (not a raw get_encoder_value() read), since a single transient
+    // sensor glitch here would silently poison the target for the whole program (no retry happens later).
+    positionAnchor = sensor->get_last_known_position();
+
+    mqtt->print("Executing program with ID: " + String(currentProgram.id) +
+                " | referenceType: " + currentProgram.referenceType +
+                " | positionAnchor: " + String(positionAnchor));
 
     // Extract the steps array from the JSON object
     JsonArray stepsArray = doc["steps"].as<JsonArray>();
@@ -50,7 +61,11 @@ void ProgramManager::execute_program(const char* jsonPayload) {
         Step& s = currentProgram.steps[currentProgram.stepsCount];
         s.time = v[GrillConstants::JSON_TIME] | 0;
         s.temperature = v[GrillConstants::JSON_TEMPERATURE] | -1;
-        s.position = v[GrillConstants::JSON_POSITION] | -1;
+        // NO_TARGET (not -1) marks "not set", since relative mode allows negative position deltas.
+        // (Copied to a local first: ArduinoJson's operator| binds its default by reference, which
+        // would otherwise require an out-of-line definition for this header-only static constexpr.)
+        const int noPositionTarget = GrillConstants::NO_TARGET;
+        s.position = v[GrillConstants::JSON_POSITION] | noPositionTarget;
         s.rotation = v[GrillConstants::JSON_ROTATION] | -1;
         s.action = v[GrillConstants::JSON_ACTION] | "";
         
@@ -157,9 +172,14 @@ void ProgramManager::start_current_step() {
         // Movimiento por temperatura
         movement->go_to_temp(step.temperature);
         stepState = STEP_MOVING_TO_TARGET;
-    } else if (step.position != -1) {
-        // Movimiento por posición
-        movement->go_to(step.position);
+    } else if (step.position != GrillConstants::NO_TARGET) {
+        // Movimiento por posición (absoluta o relativa al punto de inicio del programa)
+        int resolvedTarget = resolve_target_position(step.position);
+        mqtt->print("Position step: raw=" + String(step.position) +
+                    " mode=" + currentProgram.referenceType +
+                    " anchor=" + String(positionAnchor) +
+                    " -> resolvedTarget=" + String(resolvedTarget));
+        movement->go_to(resolvedTarget);
         stepState = STEP_MOVING_TO_TARGET;
     } else if (step.rotation != -1) {
         // Movimiento por rotación
@@ -214,7 +234,21 @@ void ProgramManager::advance_to_next_step() {
     publish_program_status(); 
 }
 
-bool ProgramManager::is_program_running() { 
+int ProgramManager::resolve_target_position(int stepPosition) {
+    int target = stepPosition;
+
+    if (currentProgram.referenceType == GrillConstants::PAYLOAD_REFERENCE_TYPE_RELATIVE) {
+        target = positionAnchor + stepPosition;
+    }
+
+    // Clamp to the encoder's valid range regardless of mode.
+    if (target < 0) target = 0;
+    if (target > 100) target = 100;
+
+    return target;
+}
+
+bool ProgramManager::is_program_running() {
     return programState == PROGRAM_RUNNING;
 }
 
@@ -229,6 +263,7 @@ void ProgramManager::publish_program_status() {
         doc["name"] = currentProgram.name;
         doc["programId"] = currentProgram.id;
         doc["currentStepIndex"] = programCurrentStep;
+        doc["referenceType"] = currentProgram.referenceType;
 
         // We manually build the steps array to inject runtime data
         JsonArray stepsArr = doc["steps"].to<JsonArray>();
@@ -239,7 +274,7 @@ void ProgramManager::publish_program_status() {
             
             if (s.time != 0) sObj["time"] = s.time;
             if (s.temperature != -1) sObj["temperature"] = s.temperature;
-            if (s.position != -1) sObj["position"] = s.position;
+            if (s.position != GrillConstants::NO_TARGET) sObj["position"] = s.position;
             if (s.rotation != -1) sObj["rotation"] = s.rotation;
             if (s.action != "") sObj["action"] = s.action;
 

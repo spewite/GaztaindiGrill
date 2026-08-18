@@ -19,7 +19,7 @@ Grill::Grill(int index, ModeManager* sharedModeManager, StatusLED* statusLed) :
         hardware = new HardwareManager(index, mqtt);
         sensor = new GrillSensor(index, mqtt, hardware, modeManager);
         movement = new MovementManager(index, mqtt, hardware, sensor, modeManager, statusLed);
-        programManager = new ProgramManager(index, mqtt, movement, statusLed);
+        programManager = new ProgramManager(index, mqtt, movement, sensor, statusLed);
 
     }
 
