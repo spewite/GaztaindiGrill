@@ -1,8 +1,3 @@
-
-- Recode the program stop management. Currently the handle_x_stop only handles to go_to functions.
-
-- Update the sensors values in loop
-
 - Reject a program when the encoder reading is invalid, instead of anchoring on a stale one.
     * execute_program() captures positionAnchor once and cannot retry, so it reads it through
       get_last_known_position() to be sure it never gets ENCODER_ERROR.
