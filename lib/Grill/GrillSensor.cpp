@@ -9,11 +9,12 @@ GrillSensor::GrillSensor(int index, GrillMQTT* mqtt, HardwareManager* hardware, 
 // ------------- ENCODER ------------- //
 
 long GrillSensor::get_encoder_value() {
+    if (!hardware->encoder->is_connected()) { return GrillConstants::ENCODER_ERROR; }
+
     long encoderValue = hardware->encoder->get_data();
 
-    if (encoderValue < 0) encoderValue = 1;
+    if (encoderValue < 0) encoderValue = 0;
     if (encoderValue > 100) encoderValue = 100;
-    if (encoderValue == 0) encoderValue = GrillConstants::ENCODER_ERROR;
 
     return encoderValue;
 }

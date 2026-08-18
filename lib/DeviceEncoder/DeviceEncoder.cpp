@@ -16,12 +16,13 @@ bool DeviceEncoder::begin(long max_pulses, float data_interval[], bool cyclic) {
     SPI.beginTransaction(SPISettings(1000000, SPI_MSBFIRST, SPI_MODE0));
     digitalWrite(_pin_cs, LOW);
     SPI.transfer(0x88); // Write to MDR0
-    SPI.transfer(0x03); // Configure to 4 byte mode
+    SPI.transfer(MDR0_CONFIG); // Configure to 4 byte mode
     digitalWrite(_pin_cs, HIGH);
     SPI.endTransaction();
     reset_counter(0);
 
-	return true;
+    // Verificacion real: si el chip no contesta, begin() debe fallar en vez de mentir.
+    return is_connected();
 }
 
 // void DeviceEncoder::reset_counter(long counter_start) {
@@ -112,4 +113,22 @@ long DeviceEncoder::get_counter(bool raw) {
 
 float DeviceEncoder::get_data() {
     return (_k * (float)get_counter() + _data_interval[0]);
+}
+
+// El LS7366R no tiene linea de error y _read_counter() no puede fallar: un bus muerto simplemente
+// devuelve 0x00 (contador 0) o 0xFF (contador -1), y ambos parecen posiciones plausibles. Releer
+// MDR0 si da una senal fiable, porque begin() dejo ahi MDR0_CONFIG: cualquier otro valor (0x00 con
+// MISO a masa, 0xFF flotando alto) significa que el chip no esta contestando.
+uint8_t DeviceEncoder::_read_mdr0() {
+    SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
+    digitalWrite(_pin_cs, LOW);     // Begin SPI conversation
+    SPI.transfer(0x48);             // Read MDR0
+    uint8_t mdr0 = SPI.transfer(0x00);
+    digitalWrite(_pin_cs, HIGH);    // Terminate SPI conversation
+    SPI.endTransaction();
+    return mdr0;
+}
+
+bool DeviceEncoder::is_connected() {
+    return _read_mdr0() == MDR0_CONFIG;
 }

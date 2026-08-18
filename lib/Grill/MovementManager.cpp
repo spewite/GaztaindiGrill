@@ -133,7 +133,7 @@ void MovementManager::handle_rotor_stop() {
 void MovementManager::go_to(int position) {
 
     if (position < 0) position = 0;
-    if (position > 100) position = 99;
+    if (position > 100) position = 100;
     
     targetPosition = position;
     int currentPercentage = sensor->get_encoder_value();
