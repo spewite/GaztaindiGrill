@@ -1,4 +1,4 @@
-#include "GRILL_config.h"
+#include "GrillConfig.h"
 
 // Define the variables here
 float DATA_INTERVAL_GRILL[] = {0, 100};

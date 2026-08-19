@@ -1,7 +1,7 @@
 #ifndef GRILL_HARDWARE_H
 #define GRILL_HARDWARE_H
 
-#include <GRILL_config.h>
+#include <GrillConfig.h>
 #include <DeviceEncoder.h>
 #include <CytronMotorDriver.h>
 // #include <Adafruit_MAX31865.h>  

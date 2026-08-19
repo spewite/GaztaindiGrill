@@ -2,7 +2,7 @@
 #define STATUS_LED_H
 
 #include <FastLED.h>
-#include <GRILL_config.h>
+#include <GrillConfig.h>
 
 #define NUM_STATUS_LEDS 1 
 

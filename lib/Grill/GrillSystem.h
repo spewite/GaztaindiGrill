@@ -1,7 +1,7 @@
 #ifndef GRILL_SYSTEM_H
 #define GRILL_SYSTEM_H
 
-#include <GRILL_config.h>
+#include <GrillConfig.h>
 #include <Grill.h>
 #include <GrillMQTT.h>
 #include <DualModeCoordinator.h>

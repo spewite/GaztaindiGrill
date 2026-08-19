@@ -25,7 +25,7 @@ pio device monitor
 
 There is no automated test suite (`test/` only contains the PlatformIO Unity placeholder `README`). Verification is manual: flash and observe serial output / MQTT traffic, or point the web client at `GaztaindiGrill-Shadow` instead of real hardware to test protocol-level changes without flashing.
 
-The OTA upload target posts to a hardcoded device IP in `platformio.ini` (`http://192.168.1.100:3232/update`) — update that if the device's static IP changes (see `GRILL_Modules/GRILL_config.h`).
+The OTA upload target posts to a hardcoded device IP in `platformio.ini` (`http://192.168.1.100:3232/update`) — update that if the device's static IP changes (see `lib/Grill/GrillConfig.h`).
 
 ## Architecture
 
@@ -45,6 +45,6 @@ Key cross-cutting flows (detailed in ARCHITECTURE.md):
 - **Multi-user sync**: the ESP32 periodically publishes a lightweight progress status; a newly-connected client that sees an unfamiliar `programId` requests the full program JSON on demand rather than the API, since the ESP32 holds the actually-running version in RAM.
 - **Disconnection handling**: uses MQTT Last Will and Testament (`grill/connection` → `offline`) so clients can detect a dead grill instead of showing stale "running" state.
 
-`GrillConstants.h` is the single source of truth for every MQTT topic, payload string, and tunable constant (timeouts, margins, `NUM_GRILLS`, `MAX_PROGRAM_STEPS`, etc.) — check it before touching anything protocol-related, and keep `GaztaindiGrill-NextJS/src/constants/mqtt.ts` in sync if you add or rename a topic.
+`GrillConstants.h` is the single source of truth for every MQTT topic, payload string, and tunable constant (timeouts, margins, `NUM_GRILLS`, `MAX_PROGRAM_STEPS`, etc.) — check it before touching anything protocol-related, and keep `GaztaindiGrill-NextJS/src/constants/mqtt.ts` in sync if you add or rename a topic. `GrillConfig.h` holds the other kind of constant instead: board wiring (GPIO pins) and deployment config (static IP, MQTT broker credentials, OTA port) — changes per board/deployment rather than per feature.
 
-`lib/` also vendors third-party libraries (Adafruit MAX31855/MAX31865, ArduinoJson, PubSubClient, CytronMotorDriver, etc.) alongside the project's own code — only `Grill/`, `GRILL_Modules/`, `DeviceEncoder/`, `DeviceRotorDrive/`, `EthernetNTP/`, `EthernetOTA/`, and `SerialTelnet/` are project-owned.
+`lib/` also vendors third-party libraries (Adafruit MAX31855/MAX31865, ArduinoJson, PubSubClient, CytronMotorDriver, etc.) alongside the project's own code — only `Grill/`, `DeviceEncoder/`, `DeviceRotorDrive/`, `EthernetNTP/`, `EthernetOTA/`, and `SerialTelnet/` are project-owned.

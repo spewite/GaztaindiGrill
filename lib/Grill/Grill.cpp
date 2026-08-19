@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <GRILL_config.h>
+#include <GrillConfig.h>
 #include <Grill.h>
 
 extern PubSubClient client;

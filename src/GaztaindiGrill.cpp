@@ -8,12 +8,12 @@
 #include <time.h>
 
 #include <GrillConstants.h>
-#include <GRILL_config.h>
+#include <GrillConfig.h>
 #include <GrillSystem.h>
 #include <StatusLED.h>
 
 // Network configuration (W5500 CS pin, static IP, MQTT credentials, OTA port)
-// lives in GRILL_config.h / GRILL_config.cpp.
+// lives in GrillConfig.h / GrillConfig.cpp.
 
 EthernetClient ethClient;
 PubSubClient client(ethClient);
