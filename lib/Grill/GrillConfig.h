@@ -73,7 +73,7 @@ const int          OTA_PORT      = 3232;
 //====================================================================================
 //   ENCODERS
 //====================================================================================
-const long PULSES_ENCODER_GRILL  = 5640L; // Default: 2400L // Neria: 5640L
+const long PULSES_ENCODER_GRILL  = 5344L; // Default: 2400L
 extern float DATA_INTERVAL_GRILL[]; // Declare as extern (Assign value in GrillConfig.cpp)
 const long PULSES_ENCODER_ROTOR  = 2400L;
 extern float DATA_INTERVAL_ROTOR[]; // Declare as extern (Assign value in GrillConfig.cpp)
