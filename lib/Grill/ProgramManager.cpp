@@ -13,20 +13,24 @@ ProgramManager::ProgramManager(int index, GrillMQTT* mqtt, MovementManager* move
      {}
 
     
-void ProgramManager::execute_program(const char* jsonPayload) { 
-     
+void ProgramManager::execute_program(GrillRequest& request) {
+
     // Cancelar cualquier programa anterior.
     finish_program(true);
 
     // Usamos JsonDocument para que v7 gestione la memoria
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, jsonPayload);
+    JsonDocument envelope;
+    DeserializationError error = deserializeJson(envelope, request.raw);
 
     if (error) {
         mqtt->print("Error deserializing the program JSON.");
+        mqtt->reply_error(request, GrillConstants::ERROR_INVALID_JSON);
         return;
     }
-    
+
+    // The program itself travels under "value", like every other command's payload.
+    JsonObject doc = envelope[GrillConstants::JSON_VALUE];
+
     // Extract the program Id. We will use -1 if doesnt exist.
     currentProgram.id = doc["programId"] | -1;
     currentProgram.description = doc["description"] | "";
@@ -48,6 +52,7 @@ void ProgramManager::execute_program(const char* jsonPayload) {
     JsonArray stepsArray = doc["steps"].as<JsonArray>();
     if (stepsArray.isNull()) {
         mqtt->print("Error: JSON does not contain a 'steps' array.");
+        mqtt->reply_error(request, GrillConstants::ERROR_NO_STEPS);
         return;
     }
 

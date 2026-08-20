@@ -214,14 +214,18 @@ void handle_mqtt_callback(char* topic, byte* payload, unsigned int length) {
             if (id >= 0 && id < GrillConstants::NUM_GRILLS && grillSystem) {
                 Grill* grill = grillSystem->get_grill(id);
                 if (grill) {
-                    grill->handle_mqtt_message(actionStr.c_str(), message);
+                    GrillRequest request = GrillMQTT::parse_request(actionStr, message);
+                    grill->handle_mqtt_message(actionStr.c_str(), request);
+                    grill->reply_ok_if_unanswered(request);
                 }
             }
         }
     }
     // If it's not a digit, it's a SYSTEM command (e.g., "current_mode" or "restart")
     else if (grillSystem) {
-        grillSystem->handle_mqtt_message(topicStr.c_str(), message);
+        GrillRequest request = GrillMQTT::parse_request(topicStr, message);
+        grillSystem->handle_mqtt_message(topicStr.c_str(), request);
+        grillSystem->reply_ok_if_unanswered(request);
     }
 }
 

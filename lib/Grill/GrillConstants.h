@@ -64,6 +64,10 @@ public:
 
     static constexpr const char* TOPIC_STATE_PROG_CURRENT = "status/program/current";
 
+    // Answer to one command. NOT retained: it is a reply, not state, so replaying it
+    // to the next client that connects would show a stale toast.
+    static constexpr const char* TOPIC_STATE_RESULT = "status/result";
+
     // --- MQTT PAYLOADS ---
     
     // JSON field names for program steps
@@ -73,6 +77,14 @@ public:
     static constexpr const char* JSON_ROTATION = "rotation";
     static constexpr const char* JSON_ACTION = "action";
     static constexpr const char* JSON_REFERENCE_TYPE = "referenceType";
+
+    // Request/response envelope. Every command arrives as { "value": ..., "requestId": ... }
+    // and every answer goes out as { requestId, command, ok, error? }.
+    static constexpr const char* JSON_REQUEST_ID = "requestId";
+    static constexpr const char* JSON_VALUE = "value";
+    static constexpr const char* JSON_COMMAND = "command";
+    static constexpr const char* JSON_OK = "ok";
+    static constexpr const char* JSON_ERROR = "error";
 
 
     // General payloads
@@ -95,6 +107,21 @@ public:
     // Program reference type payloads
     static constexpr const char* PAYLOAD_REFERENCE_TYPE_ABSOLUTE = "absolute";
     static constexpr const char* PAYLOAD_REFERENCE_TYPE_RELATIVE = "relative";
+
+    // Sentinel requestId: the answer is for every connected client, not just the
+    // one that asked. Used for things that happen to the grill rather than to a
+    // single request (emergency stop, a program cancelled by somebody else).
+    static constexpr const char* PAYLOAD_REQUEST_ID_EVERYONE = "EVERYONE";
+
+    // --- COMMAND ERROR CODES ---
+    // Codes, never display text: the client owns the wording, so rewording a
+    // message must not require reflashing the grill.
+    static constexpr const char* ERROR_INVALID_JSON = "invalid_json";
+    static constexpr const char* ERROR_NO_STEPS = "no_steps";
+    static constexpr const char* ERROR_NO_ROTOR = "no_rotor";
+    static constexpr const char* ERROR_ROTATION_OUT_OF_RANGE = "rotation_out_of_range";
+    static constexpr const char* ERROR_MODE_CHANGE_DENIED = "mode_change_denied";
+    static constexpr const char* ERROR_NO_PROGRAM_RUNNING = "no_program_running";
 };
 
 #endif

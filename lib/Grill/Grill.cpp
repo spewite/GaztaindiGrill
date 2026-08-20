@@ -126,10 +126,6 @@ Mode Grill::get_mode() {
 //
 // Programs
 //
-void Grill::execute_program(const char* program) {
-    programManager->execute_program(program);
-}
-
 void Grill::update_program() {
     programManager->update_program();
 }
@@ -146,9 +142,19 @@ void Grill::subscribe_to_topics() {
     mqtt->subscribe_to_topics();
 }
 
-void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
+void Grill::reply_ok_if_unanswered(GrillRequest& request) {
+    // Only answer somebody who actually asked. An EVERYONE id means the payload carried no
+    // requestId at all: a retained state topic the ESP32 reads back at boot, or a manual
+    // mosquitto_pub. Nobody is waiting, so an automatic "ok" would just be noise. Deliberate
+    // broadcasts still go out through reply_to().
+    if (request.replied) { return; }
+    if (request.id == GrillConstants::PAYLOAD_REQUEST_ID_EVERYONE) { return; }
+    mqtt->reply_ok(request);
+}
+
+void Grill::handle_mqtt_message(const char* pAction, GrillRequest& request) {
     String topic(pAction);
-    String payload(pPayload);
+    String payload = request.value;
 
     // We don't log the log topic itself to avoid loops
     if (topic != GrillConstants::TOPIC_LOG) {
@@ -162,6 +168,7 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
     // If resetting, ignore all other commands
     if (is_resetting()) {
         mqtt->print("Grill is resetting, command ignored");
+        mqtt->reply_error(request, GrillConstants::PAYLOAD_RESETTING);
         return;
     }
 
@@ -173,9 +180,15 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
         } else if (payload == GrillConstants::PAYLOAD_STOP) {
             movement->stop_lineal_actuator();
         }
-    }  
+    }
 
     if (topic == GrillConstants::TOPIC_CMD_MOVE_ROTATION) {
+        // Only grill 0 is built with a rotor. Without this the call below would dereference
+        // an unallocated pointer on grill 1.
+        if (!movement->has_rotor()) {
+            mqtt->reply_error(request, GrillConstants::ERROR_NO_ROTOR);
+            return;
+        }
         if (payload == GrillConstants::PAYLOAD_CLOCKWISE) {
             movement->rotate_clockwise();
         } else if (payload == GrillConstants::PAYLOAD_COUNTER_CLOCKWISE) {
@@ -183,30 +196,44 @@ void Grill::handle_mqtt_message(const char* pAction, const char* pPayload) {
         } else if (payload == GrillConstants::PAYLOAD_STOP) {
             movement->stop_rotor();
         }
-    }  
+    }
 
     if (topic == GrillConstants::TOPIC_CMD_SET_POSITION) {
         int posicion = payload.toInt();
         movement->go_to(posicion);
     }
-    
-    
+
+
     if (topic == GrillConstants::TOPIC_CMD_PROG_EXECUTE) {
-        mqtt->print("Executing a program..."); 
-        programManager->execute_program(pPayload);
+        mqtt->print("Executing a program...");
+        programManager->execute_program(request);
     }
-    
+
     if (topic == GrillConstants::TOPIC_CMD_PROG_CANCEL) {
+        if (!programManager->is_program_running()) {
+            mqtt->reply_error(request, GrillConstants::ERROR_NO_PROGRAM_RUNNING);
+            return;
+        }
         programManager->finish_program(true);
         mqtt->print("Program cancelled");
     }
-    
+
     if (topic == GrillConstants::TOPIC_CMD_SET_ROTATION)
     {
+        if (!movement->has_rotor()) {
+            mqtt->reply_error(request, GrillConstants::ERROR_NO_ROTOR);
+            return;
+        }
+        // Validated here rather than inside go_to_rotor(): input is checked at the boundary,
+        // and MovementManager stays free of any reply concern.
         int grades = payload.toInt();
+        if (grades < 0 || grades >= 360) {
+            mqtt->reply_error(request, GrillConstants::ERROR_ROTATION_OUT_OF_RANGE);
+            return;
+        }
         movement->go_to_rotor(grades);
     }
-        
+
     if (topic == GrillConstants::TOPIC_CMD_REQ_PROG_STATUS) {
         programManager->publish_program_status();
     }

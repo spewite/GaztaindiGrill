@@ -20,7 +20,10 @@ public:
     void stop_lineal_actuator();
     void stop_lineal_actuator_raw();
 
-    void turn_around();   
+    // Only grill 0 is built with a rotor; on grill 1 hardware->rotor is null.
+    bool has_rotor();
+
+    void turn_around();
     void rotate_clockwise();
     void rotate_counter_clockwise();
     void stop_rotor();

@@ -33,7 +33,7 @@ public:
 
     // ----------------- PROGRAMS ----------------- //
     void update_program();
-    void execute_program(const char* program);
+    void execute_program(GrillRequest& request);
     void publish_program_status();
     void finish_program(bool forcedCancelation);
     bool is_program_running();

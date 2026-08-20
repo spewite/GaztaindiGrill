@@ -153,7 +153,14 @@ void GrillSystem::set_system_mode(Mode newMode) {
         if (grills[i] && grills[i]->is_program_running()) {
             
             // Cancel the request by reverting to current mode
-            mqtt->print("Program in progress. Mode change denied."); 
+            mqtt->print("Program in progress. Mode change denied.");
+
+            // Deferred answer: the handler that received this request returned long ago, so the
+            // requester is whoever ModeManager recorded, not whatever message arrived last.
+            mqtt->reply_to(modeManager->requestedByRequestId,
+                           modeManager->requestedByCommand,
+                           false,
+                           GrillConstants::ERROR_MODE_CHANGE_DENIED);
 
             modeManager->requestedMode = modeManager->mode;
             return;
@@ -169,32 +176,54 @@ void GrillSystem::set_system_mode(Mode newMode) {
 
     modeManager->confirmMode();
     Serial.println(newMode == DUAL ? "SYSTEM: DUAL MODE ACTIVATED" : "SYSTEM: SINGLE MODE ACTIVATED");
-    
+
+    // Deferred answer, same as the rejection above.
+    mqtt->reply_to(modeManager->requestedByRequestId,
+                   modeManager->requestedByCommand,
+                   true,
+                   nullptr);
+
     // Notify the current mode back to the user
     String currentMode = modeManager->getCurrentMode();
     mqtt->publish_message(GrillConstants::TOPIC_CURRENT_MODE, currentMode, true); // Retained to ensure new clients get it
 }
 
-void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) {
+void GrillSystem::reply_ok_if_unanswered(GrillRequest& request) {
+    // See the note in Grill::reply_ok_if_unanswered(): EVERYONE means nobody asked, and the
+    // ESP32 subscribes to its own retained reset_status/current_mode topics, so this would
+    // otherwise fire on every boot.
+    if (request.replied) { return; }
+    if (request.id == GrillConstants::PAYLOAD_REQUEST_ID_EVERYONE) { return; }
+    mqtt->reply_ok(request);
+}
 
-    
+void GrillSystem::handle_mqtt_message(const char* pTopic, GrillRequest& request) {
+
+
     String topic(pTopic);
-    String payload(pPayload);
+    String payload = request.value;
 
     mqtt->print("[GrillSystem::handle_mqtt_message] topic: " + topic);
 
     if (topic == GrillConstants::TOPIC_CURRENT_MODE) {
         mqtt->print("Syncing mode from MQTT...");
+        // Retained state the ESP32 reads back at boot, not a user command: nobody is waiting
+        // for an answer, so the outcome is broadcast rather than addressed.
         if (payload == GrillConstants::PAYLOAD_SINGLE && modeManager->mode != SINGLE) {
-            modeManager->requestMode(SINGLE);
+            modeManager->requestMode(SINGLE, GrillConstants::PAYLOAD_REQUEST_ID_EVERYONE, topic);
         } else if (payload == GrillConstants::PAYLOAD_DUAL && modeManager->mode != DUAL) {
-            modeManager->requestMode(DUAL);
+            modeManager->requestMode(DUAL, GrillConstants::PAYLOAD_REQUEST_ID_EVERYONE, topic);
         }
+        mqtt->defer(request);
     }
 
     if (topic == GrillConstants::TOPIC_CMD_SYS_RESTART) {
         mqtt->print("Restarting entire system...");
-        
+
+        // Answered here rather than by the dispatcher: ESP.restart() below never returns, so
+        // an automatic reply would never be reached.
+        mqtt->reply_ok(request);
+
         // Notify that the system is starting to reset
         mqtt->publish_message(GrillConstants::TOPIC_RESET_STATUS, GrillConstants::PAYLOAD_RESETTING, true);
         
@@ -223,17 +252,21 @@ void GrillSystem::handle_mqtt_message(const char* pTopic, const char* pPayload) 
     
     if (topic == GrillConstants::TOPIC_REQ_MODE_CHANGE)
     {
-        mqtt->print("Received mode change request..."); 
+        mqtt->print("Received mode change request...");
 
         if (payload == GrillConstants::PAYLOAD_SINGLE)
         {
-            modeManager->requestMode(SINGLE);
+            modeManager->requestMode(SINGLE, request.id, request.command);
         }
-        
+
         if (payload == GrillConstants::PAYLOAD_DUAL)
         {
-            modeManager->requestMode(DUAL);
+            modeManager->requestMode(DUAL, request.id, request.command);
         }
+
+        // Only the intent is recorded here. set_system_mode() decides in a later loop iteration
+        // and answers then, so no automatic ok must go out now or it would contradict it.
+        mqtt->defer(request);
     }
 
 

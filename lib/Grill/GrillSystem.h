@@ -29,7 +29,10 @@ public:
     void handle_dual_mode();
 
     // MQTT Handling
-    void handle_mqtt_message(const char* topic, const char* payload);
+    void handle_mqtt_message(const char* topic, GrillRequest& request);
+
+    // Called by the dispatcher once the handler returns: anything that did not reject succeeded.
+    void reply_ok_if_unanswered(GrillRequest& request);
     void resubscribe_all();
     
 private:

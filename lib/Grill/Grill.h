@@ -58,13 +58,15 @@ public:
     Mode get_mode();
 
     // Programs
-    void execute_program(const char* program);
     void update_program();
     bool is_program_running();
     
     // MQTT
     void subscribe_to_topics();
-    void handle_mqtt_message(const char* pAction, const char* pPayload);
+    void handle_mqtt_message(const char* pAction, GrillRequest& request);
+
+    // Called by the dispatcher once the handler returns: anything that did not reject succeeded.
+    void reply_ok_if_unanswered(GrillRequest& request);
 
 
 

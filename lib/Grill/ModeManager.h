@@ -24,8 +24,16 @@ public:
     Mode mode = SINGLE;
     Mode requestedMode = SINGLE;
 
-    void requestMode(Mode newMode) {
+    // Who asked for the pending mode change. The request is only recorded here; the accept or
+    // reject happens later in GrillSystem::update(), by which time the incoming message is long
+    // gone, so the id has to travel with the pending operation to reach the right client.
+    String requestedByRequestId = GrillConstants::PAYLOAD_REQUEST_ID_EVERYONE;
+    String requestedByCommand = "";
+
+    void requestMode(Mode newMode, const String& requestId, const String& command) {
         requestedMode = newMode;
+        requestedByRequestId = requestId;
+        requestedByCommand = command;
     }
 
     void confirmMode() {

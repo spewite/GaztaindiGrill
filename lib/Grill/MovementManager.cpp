@@ -64,18 +64,26 @@ void MovementManager::stop_lineal_actuator_raw() {
 
 /// ----------- ROTOR ----------- ///
 
+bool MovementManager::has_rotor()
+{
+    return hardware->rotor != nullptr;
+}
+
 void MovementManager::rotate_clockwise()
 {
+    if (!has_rotor()) { return; }
     hardware->rotor->rotate_clockwise();
 }
 
 void MovementManager::rotate_counter_clockwise()
 {
+    if (!has_rotor()) { return; }
     hardware->rotor->rotate_counter_clockwise();
 }
 
 void MovementManager::stop_rotor()
 {
+    if (!has_rotor()) { return; }
     hardware->rotor->stop();
 }
 
@@ -95,11 +103,11 @@ void MovementManager::turn_around() {
 
 void MovementManager::go_to_rotor(int degrees) {
 
-    if (degrees < 0 || degrees >= 360) {
-        mqtt->print("Rotor degrees out of range");
-        return;
-    }  
-     
+    // The MQTT boundary (Grill::handle_mqtt_message) validates this too, and can answer the
+    // client. Kept here as well because turn_around() reaches this directly.
+    if (!has_rotor() || degrees < 0 || degrees >= 360) { return; }
+
+
     int currentRotorPosition = sensor->get_rotor_encoder_value();
     targetDegrees = degrees;
      

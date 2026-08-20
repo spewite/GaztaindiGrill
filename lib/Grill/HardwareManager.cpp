@@ -1,7 +1,11 @@
 
 #include <HardwareManager.h>
 
-HardwareManager::HardwareManager(int index, GrillMQTT* mqtt): grillIndex(index), mqtt(mqtt) {}
+// rotor, rotorEncoder and thermocouple are only allocated for grill 0 in setup_devices().
+// They must start as nullptr so the guards elsewhere can tell "absent" from garbage.
+HardwareManager::HardwareManager(int index, GrillMQTT* mqtt):
+    mqtt(mqtt), drive(nullptr), encoder(nullptr), rotorEncoder(nullptr),
+    rotor(nullptr), thermocouple(nullptr), grillIndex(index) {}
 
 bool HardwareManager::setup_devices() {
    
