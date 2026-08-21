@@ -23,7 +23,7 @@ pio run -e esp32doit-devkit-v1 -t upload
 pio device monitor
 ```
 
-There is no automated test suite (`test/` only contains the PlatformIO Unity placeholder `README`). Verification is manual: flash and observe serial output / MQTT traffic, or point the web client at `GaztaindiGrill-Shadow` instead of real hardware to test protocol-level changes without flashing.
+There is no automated test suite (`test/` only contains the PlatformIO Unity placeholder `README`). Verification is manual: flash, then watch serial output and MQTT traffic — `mosquitto_sub -v -t 'grill/#'` against the broker is the fastest way to see the protocol as the grill speaks it.
 
 The OTA upload target posts to a hardcoded device IP in `platformio.ini` (`http://192.168.1.100:3232/update`) — update that if the device's static IP changes (see `lib/Grill/GrillConfig.h`).
 
