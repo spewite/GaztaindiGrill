@@ -14,7 +14,6 @@ public:
     // ----------------- SENSORS ----------------- //
     int get_rotor_encoder_value();
     long get_encoder_value();
-    long get_last_known_position();
     int  get_temperature();
     bool limit_switch_pressed(const int cs_limit_switch);
     bool is_valid_temperature(int temperature);

@@ -40,9 +40,22 @@ void ProgramManager::execute_program(GrillRequest& request) {
     currentProgram.referenceType = doc[GrillConstants::JSON_REFERENCE_TYPE] | GrillConstants::PAYLOAD_REFERENCE_TYPE_ABSOLUTE;
 
     // Anchor for "relative" referenceType: the grill's position right now, before the program moves it.
-    // Uses the filtered last-known reading (not a raw get_encoder_value() read), since a single transient
-    // sensor glitch here would silently poison the target for the whole program (no retry happens later).
-    positionAnchor = sensor->get_last_known_position();
+    // Captured once and never re-read, so a bad reading here would silently mis-place every step of
+    // the whole program. Refusing to start is far cheaper than cooking in the wrong position.
+    if (currentProgram.referenceType == GrillConstants::PAYLOAD_REFERENCE_TYPE_RELATIVE) {
+        long currentPosition = sensor->get_encoder_value();
+
+        if (currentPosition == GrillConstants::ENCODER_ERROR) {
+            mqtt->print("Cannot start a relative program: the encoder is not answering.");
+            mqtt->reply_error(request, GrillConstants::ERROR_ENCODER_NOT_ANSWERING);
+            return;
+        }
+
+        positionAnchor = currentPosition;
+    } else {
+        // Unused in absolute mode; cleared so the log below never shows a stale anchor.
+        positionAnchor = 0;
+    }
 
     mqtt->print("Executing program with ID: " + String(currentProgram.id) +
                 " | referenceType: " + currentProgram.referenceType +

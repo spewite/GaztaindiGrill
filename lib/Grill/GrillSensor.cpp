@@ -3,7 +3,7 @@
 
 GrillSensor::GrillSensor(int index, GrillMQTT* mqtt, HardwareManager* hardware, ModeManager* modeManager):
     grillIndex(index), mqtt(mqtt), hardware(hardware), modeManager(modeManager),
-    lastEncoderValue(0), lastRotorEncoderValue(0), lastTemperatureValue(0) {}
+    lastEncoderValue(GrillConstants::ENCODER_ERROR), lastRotorEncoderValue(0), lastTemperatureValue(0) {}
 
 
 // ------------- ENCODER ------------- //
@@ -17,12 +17,6 @@ long GrillSensor::get_encoder_value() {
     if (encoderValue > 100) encoderValue = 100;
 
     return encoderValue;
-}
-
-// Last reading accepted by update_encoder(): never ENCODER_ERROR, at most one loop old.
-// For one-shot callers that cannot retry, e.g. the relative-mode anchor in ProgramManager.
-long GrillSensor::get_last_known_position() {
-    return lastEncoderValue;
 }
 
 void GrillSensor::update_encoder() {
